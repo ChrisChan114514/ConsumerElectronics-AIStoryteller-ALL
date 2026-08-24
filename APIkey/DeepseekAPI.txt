@@ -1,0 +1,2 @@
+# Copy this file to DeepseekAPI.local.txt and set the real key there.
+LLM_API_KEY=sk-1c09179443aa4e658aaa48f834826abb

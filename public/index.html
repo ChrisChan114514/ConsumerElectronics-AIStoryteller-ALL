@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <title>AI Storyteller Control Console</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">ST</span>
+      <div>
+        <strong>AI Storyteller</strong>
+        <span>English literacy story console</span>
+      </div>
+    </div>
+    <nav class="view-switcher" aria-label="Console views">
+      <button type="button" class="active" data-view="builder" aria-pressed="true">Story Builder</button>
+      <button type="button" data-view="database" aria-pressed="false">Database</button>
+    </nav>
+    <div class="service-state" id="serviceState" role="status">
+      <span class="state-dot" aria-hidden="true"></span>
+      <span id="serviceStateText">Connecting</span>
+    </div>
+  </header>
+
+  <main class="workspace" id="builderView">
+    <section class="builder-pane" aria-labelledby="builderTitle">
+      <div class="pane-heading">
+        <div>
+          <span class="eyebrow">CARD COMPOSER / 单卡槽累计</span>
+          <h1 id="builderTitle">Build a story</h1>
+        </div>
+        <button type="button" class="button secondary" id="previewButton">Preview prompt</button>
+      </div>
+
+      <form id="storyForm" class="story-form">
+        <section class="scan-section" aria-labelledby="scanTitle">
+          <div class="section-title-row">
+            <div>
+              <h2 id="scanTitle">Latest card sequence</h2>
+              <span id="storyMode">No cards selected</span>
+            </div>
+            <button type="button" class="text-button" id="clearCardsButton" disabled>Clear</button>
+          </div>
+
+          <div class="card-queue" id="cardQueue" aria-live="polite"></div>
+
+          <div class="demo-row">
+            <span>Test sequence</span>
+            <div class="demo-modes" aria-label="Load a card-count test sequence">
+              <button type="button" data-demo-count="1">1 card</button>
+              <button type="button" data-demo-count="2">2 cards</button>
+              <button type="button" data-demo-count="3">3 cards</button>
+              <button type="button" data-demo-count="4">4 cards</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-section" aria-labelledby="settingsTitle">
+          <div class="section-title-row">
+            <h2 id="settingsTitle">Story settings</h2>
+          </div>
+
+          <div class="settings-grid">
+            <label>
+              <span>Child name <small>optional</small></span>
+              <input name="nickname" maxlength="24" placeholder="Alex">
+            </label>
+            <label>
+              <span>Age</span>
+              <input name="age" type="number" min="2" max="12" value="4" required>
+            </label>
+          </div>
+
+          <div class="mode-settings">
+            <fieldset>
+              <legend>Story language</legend>
+              <div class="segmented-control language-control">
+                <label><input type="radio" name="language" value="en-US" checked><span>English<small>Primary</small></span></label>
+                <label><input type="radio" name="language" value="zh-CN"><span>中文<small>Bilingual test</small></span></label>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>Story length</legend>
+              <div class="segmented-control length-control">
+                <label><input type="radio" name="length" value="short"><span>Short<small>~1 min</small></span></label>
+                <label><input type="radio" name="length" value="medium" checked><span>Medium<small>~2 min</small></span></label>
+                <label><input type="radio" name="length" value="long"><span>Long<small>~4 min</small></span></label>
+              </div>
+            </fieldset>
+          </div>
+
+          <details class="advanced">
+            <summary>Model settings</summary>
+            <div class="advanced-grid">
+              <label class="model-field"><span>Model</span><input name="model" id="modelInput" maxlength="100"></label>
+              <label><span>Creativity <output id="temperatureOutput">0.8</output></span><input name="temperature" id="temperatureInput" type="range" min="0" max="1.5" value="0.8" step="0.1"></label>
+              <label><span>Max tokens</span><input name="maxTokens" type="number" min="256" max="4000" value="1800"></label>
+            </div>
+          </details>
+        </section>
+
+        <section class="catalog-section" aria-labelledby="catalogTitle">
+          <div class="catalog-heading">
+            <div>
+              <h2 id="catalogTitle">Word cards</h2>
+              <span id="catalogCount">128 bilingual cards</span>
+            </div>
+            <div class="catalog-filters">
+              <label class="search-field">
+                <span class="sr-only">Search cards</span>
+                <input id="cardSearch" type="search" placeholder="Search English / 中文 / ID" autocomplete="off">
+              </label>
+              <label>
+                <span class="sr-only">Card category</span>
+                <select id="categoryFilter"><option value="all">All categories</option></select>
+              </label>
+            </div>
+          </div>
+          <div class="catalog-grid" id="cardCatalog" aria-live="polite"></div>
+        </section>
+
+        <div class="form-actions">
+          <button type="submit" class="button primary" id="generateButton" disabled>
+            <span class="button-label">Generate English story &amp; audio</span>
+            <span class="button-working"><span id="generateWorking">Generating story</span> <i></i><i></i><i></i></span>
+          </button>
+          <p id="formMessage" role="alert"></p>
+        </div>
+      </form>
+    </section>
+
+    <section class="result-pane" aria-labelledby="resultTitle">
+      <div class="pane-heading result-heading">
+        <div>
+          <span class="eyebrow">LLM OUTPUT</span>
+          <h2 id="resultTitle">Story result</h2>
+        </div>
+        <button type="button" class="button secondary" id="copyButton" disabled>Copy</button>
+      </div>
+
+      <div class="result-scroll">
+        <div class="empty-result" id="emptyResult">
+          <span class="empty-number">A</span>
+          <h3>No story generated</h3>
+          <p id="emptyResultText">Select 1 to 4 word cards.</p>
+        </div>
+
+        <article class="story-result" id="storyResult" hidden>
+          <div class="story-meta" id="storyMeta"></div>
+          <section class="speech-panel" aria-labelledby="speechTitle">
+            <div>
+              <span class="eyebrow">DOUBAO TTS</span>
+              <h4 id="speechTitle">Story voice</h4>
+              <p id="speechStatus">Generate an MP3 narration from this story.</p>
+            </div>
+            <button type="button" class="button secondary speech-button" id="speechButton" disabled>
+              <span class="speech-button-label">Generate voice</span>
+              <span class="speech-button-working" hidden>Synthesizing...</span>
+            </button>
+            <audio id="storyAudio" controls preload="metadata" hidden></audio>
+            <a class="download-audio" id="downloadAudio" download="ai-story.mp3" hidden>Download MP3</a>
+          </section>
+          <h3 class="story-title" id="storyTitle"></h3>
+          <div class="story-text" id="storyText"></div>
+        </article>
+
+        <section class="request-log" aria-labelledby="logTitle">
+          <div class="log-title">
+            <span id="logTitle">Recent requests</span>
+            <button type="button" id="clearLogButton">Clear</button>
+          </div>
+          <ol id="requestLog"><li class="log-empty">No requests yet</li></ol>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <main class="database-view" id="databaseView" hidden>
+    <header class="database-heading">
+      <div>
+        <span class="eyebrow">MYSQL / STORY INVENTORY</span>
+        <h1>Database activity</h1>
+        <p>Story pools, cached narration, and client listening history.</p>
+      </div>
+      <div class="database-actions">
+        <span id="databaseUpdated">Not checked</span>
+        <button type="button" class="button secondary" id="refreshDatabase">Refresh</button>
+      </div>
+    </header>
+
+    <div class="database-scroll">
+      <section class="connection-band" aria-labelledby="connectionTitle">
+        <div class="connection-title">
+          <span class="database-dot" id="databaseDot" aria-hidden="true"></span>
+          <div><h2 id="connectionTitle">MySQL connection</h2><p id="databaseMessage">Checking database...</p></div>
+        </div>
+        <dl class="connection-details">
+          <div><dt>Host</dt><dd id="databaseHost">-</dd></div>
+          <div><dt>Schema</dt><dd id="databaseName">-</dd></div>
+          <div><dt>Version</dt><dd id="databaseVersion">-</dd></div>
+          <div><dt>Server time</dt><dd id="databaseTime">-</dd></div>
+        </dl>
+      </section>
+
+      <section class="database-content" id="databaseContent" hidden>
+        <audio id="databaseAudio" controls hidden></audio>
+        <div class="metric-strip" aria-label="Database totals">
+          <div><span>Story pools</span><strong id="metricPools">0</strong></div>
+          <div><span>Stories</span><strong id="metricStories">0</strong></div>
+          <div><span>Cached audio</span><strong id="metricAudio">0</strong><small id="metricAudioSize">0 MB</small></div>
+          <div><span>Clients</span><strong id="metricClients">0</strong><small id="metricClientTypes">0 PC / 0 device</small></div>
+          <div><span>Total plays</span><strong id="metricPlays">0</strong></div>
+        </div>
+
+        <section class="data-section" aria-labelledby="poolsTitle">
+          <div class="data-heading"><div><h2 id="poolsTitle">Combination pools</h2><p>Latest 100 card combinations and current capacity.</p></div><span id="poolRowCount">0 rows</span></div>
+          <div class="table-scroll"><table><thead><tr><th>Cards</th><th>Language</th><th>Stories</th><th>Capacity</th><th>Updated</th></tr></thead><tbody id="poolRows"></tbody></table></div>
+        </section>
+
+        <section class="data-section" aria-labelledby="storiesTitle">
+          <div class="data-heading"><div><h2 id="storiesTitle">Generated stories and audio</h2><p>Latest 100 stories with narration and listening totals.</p></div><span id="storyRowCount">0 rows</span></div>
+          <div class="table-scroll"><table><thead><tr><th>Story</th><th>Cards</th><th>Audio</th><th>Listeners / plays</th><th>Created</th></tr></thead><tbody id="storyRows"></tbody></table></div>
+        </section>
+
+        <section class="data-section" aria-labelledby="clientsTitle">
+          <div class="data-heading"><div><h2 id="clientsTitle">PC and device clients</h2><p>Stable client IDs and accumulated usage.</p></div><span id="clientRowCount">0 rows</span></div>
+          <div class="table-scroll"><table><thead><tr><th>Client ID</th><th>Type</th><th>Unique stories</th><th>Total plays</th><th>Last activity</th></tr></thead><tbody id="clientRows"></tbody></table></div>
+        </section>
+
+        <section class="data-section" aria-labelledby="activityTitle">
+          <div class="data-heading"><div><h2 id="activityTitle">Recent listening activity</h2><p>Most recent story usage events.</p></div><span id="activityRowCount">0 rows</span></div>
+          <div class="table-scroll"><table><thead><tr><th>Client</th><th>Story</th><th>Play count</th><th>Last played</th></tr></thead><tbody id="activityRows"></tbody></table></div>
+        </section>
+      </section>
+    </div>
+  </main>
+
+  <dialog id="promptDialog">
+    <div class="dialog-header">
+      <div><span class="eyebrow">REQUEST PREVIEW</span><h2>Final prompt</h2></div>
+      <button type="button" class="close-button" id="closeDialogButton" aria-label="Close">&times;</button>
+    </div>
+    <pre id="promptContent"></pre>
+  </dialog>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+# Local reference material and office documents
+ref/
+WebService/DeepseekAPI.local.txt
+WebService/APIkey/DeepseekAPI.local.txt
+*.doc
+*.docx
+*.docm
+*.dot
+*.dotx
+~$*.doc*
+
+# Local configuration and generated files
+.env
+.env.*
+!.env.example
+node_modules/
+coverage/
+*.log
+.DS_Store
+__MACOSX/
+._*
+Thumbs.db
