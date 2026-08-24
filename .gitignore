@@ -15,6 +15,8 @@ WebService/APIkey/DeepseekAPI.local.txt
 !.env.example
 node_modules/
 IoT/generated-audio/
+IoT/runtime-status.json
+IoT/runtime-status.json.*.tmp
 coverage/
 *.log
 .DS_Store

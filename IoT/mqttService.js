@@ -3,6 +3,7 @@ import net from 'node:net';
 import { iotConfig } from './config.js';
 import { StoryOrchestrator } from './orchestrator.js';
 import { StoryServiceClient } from './storyClient.js';
+import { IoTRuntimeStatus } from './runtimeStatus.js';
 
 const deviceIdPattern = /^(?:ESP32-[A-Fa-f0-9]{12}|SIM-[A-Za-z0-9_-]{1,40})$/;
 const topicPattern = /^story\/v1\/devices\/([^/]+)\/(request|events|status)$/;
@@ -38,6 +39,7 @@ export async function createIoTService(options = {}) {
     audioDirectory: settings.audioDirectory,
     publicAudioBaseUrl: settings.publicAudioBaseUrl
   });
+  const runtimeStatus = options.runtimeStatus || new IoTRuntimeStatus({ statusPath: settings.statusPath });
   const devices = new Map();
 
   broker.authenticate = (client, username, password, callback) => {
@@ -46,6 +48,7 @@ export async function createIoTService(options = {}) {
       password?.toString() === settings.mqttPassword;
     const error = valid ? null : new Error('Invalid IoT device credentials or client ID.');
     if (error) error.returnCode = 4;
+    if (!valid) runtimeStatus.authRejected(client?.id || 'unknown');
     callback(error, valid);
   };
 
@@ -65,11 +68,13 @@ export async function createIoTService(options = {}) {
   broker.on('clientReady', (client) => {
     devices.set(client.id, { device_id: client.id, online: true, connected_at: new Date().toISOString() });
     console.log(JSON.stringify({ event: 'iot.device_connected', deviceId: client.id }));
+    runtimeStatus.connected(client.id, client.conn?.remoteAddress || '');
   });
   broker.on('clientDisconnect', (client) => {
     const previous = devices.get(client.id) || { device_id: client.id };
     devices.set(client.id, { ...previous, online: false, disconnected_at: new Date().toISOString() });
     console.log(JSON.stringify({ event: 'iot.device_disconnected', deviceId: client.id }));
+    runtimeStatus.disconnected(client.id);
   });
   broker.on('clientError', (client, error) => {
     console.error(JSON.stringify({ event: 'iot.client_error', deviceId: client?.id, message: error.message }));
@@ -96,8 +101,12 @@ export async function createIoTService(options = {}) {
       event: 'iot.story_requested', deviceId,
       requestId: payload.request_id, cards: payload.card_ids
     }));
+    runtimeStatus.storyRequested(deviceId, payload);
     void orchestrator.run(deviceId, payload,
-      (event) => publishBroker(broker, topicFor(deviceId, 'events'), event))
+      (event) => {
+        runtimeStatus.storyEvent(deviceId, event);
+        return publishBroker(broker, topicFor(deviceId, 'events'), event);
+      })
       .catch((error) => console.error(JSON.stringify({
         event: 'iot.orchestration_failed', deviceId, message: error.message
       })));
@@ -109,6 +118,7 @@ export async function createIoTService(options = {}) {
       const payload = JSON.parse(packet.payload.toString('utf8'));
       const previous = devices.get(match[1]) || { device_id: match[1], online: true };
       devices.set(match[1], { ...previous, ...payload, last_seen_at: new Date().toISOString() });
+      runtimeStatus.statusReceived(match[1], payload);
     } catch (error) {
       console.error(JSON.stringify({ event: 'iot.invalid_status', deviceId: match?.[1], message: error.message }));
     }
@@ -120,6 +130,7 @@ export async function createIoTService(options = {}) {
     broker,
     server,
     devices,
+    runtimeStatus,
     async start(port = settings.mqttPort, host = settings.host) {
       await new Promise((resolve, reject) => {
         server.once('error', reject);
@@ -128,11 +139,16 @@ export async function createIoTService(options = {}) {
           resolve();
         });
       });
+      await runtimeStatus.start(host, server.address().port);
       return server.address();
     },
     async close() {
-      if (server.listening) await new Promise((resolve) => server.close(resolve));
+      const serverClosed = server.listening
+        ? new Promise((resolve) => server.close(resolve))
+        : Promise.resolve();
       await new Promise((resolve) => broker.close(resolve));
+      await serverClosed;
+      await runtimeStatus.close();
     }
   };
 }

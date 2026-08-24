@@ -44,6 +44,7 @@ test('authenticates a device and completes the story control flow', async () => 
     host: '127.0.0.1', mqttPort: 0,
     mqttUsername: 'test-user', mqttPassword: 'test-password',
     publicAudioBaseUrl: 'http://127.0.0.1:2210', audioDirectory: directory,
+    statusPath: path.join(directory, 'runtime-status.json'),
     storyClient
   });
   let client;
@@ -76,6 +77,7 @@ test('rejects invalid MQTT credentials', async () => {
     host: '127.0.0.1', mqttPort: 0,
     mqttUsername: 'right-user', mqttPassword: 'right-password',
     publicAudioBaseUrl: 'http://127.0.0.1:2210', audioDirectory: os.tmpdir(),
+    statusPath: path.join(os.tmpdir(), `story-iot-status-${process.pid}.json`),
     storyClient: { generateStory() {}, synthesizeSpeech() {} }
   });
   try {

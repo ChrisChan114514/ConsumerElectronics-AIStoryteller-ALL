@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { createServer } from '../src/server.js';
 
 async function withServer(run) {
@@ -62,6 +65,34 @@ test('reports a disabled database to the control dashboard', async () => {
     assert.equal(body.connection.port, 2211);
     assert.match(body.message, /MYSQL_ENABLED/);
   });
+});
+
+test('serves the IoT broker snapshot to the third console view', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'story-iot-dashboard-'));
+  const statusPath = path.join(directory, 'runtime-status.json');
+  await fs.writeFile(statusPath, JSON.stringify({
+    service: 'story-machine-iot', online: true, host: '0.0.0.0', port: 2215,
+    started_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    connected_devices: 1,
+    counters: { connections: 2, story_requests: 1, status_messages: 5, stories_ready: 1 },
+    devices: [{ device_id: 'ESP32-000000000001', online: true, state: 'playing' }],
+    recent_actions: [{ at: new Date().toISOString(), type: 'story.ready', device_id: 'ESP32-000000000001' }]
+  }));
+  const server = createServer({ storyDatabase: { configured: false }, iotStatusPath: statusPath });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/iot/dashboard`);
+    const dashboard = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(dashboard.online, true);
+    assert.equal(dashboard.port, 2215);
+    assert.equal(dashboard.connected_devices, 1);
+    assert.equal(dashboard.devices[0].state, 'playing');
+    assert.equal(dashboard.recent_actions[0].type, 'story.ready');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    await fs.rm(directory, { recursive: true, force: true });
+  }
 });
 
 test('serves database inventory and stored audio to the second console view', async () => {

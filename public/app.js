@@ -38,6 +38,7 @@ const elements = {
   viewButtons: document.querySelectorAll('[data-view]'),
   builderView: document.querySelector('#builderView'),
   databaseView: document.querySelector('#databaseView'),
+  iotView: document.querySelector('#iotView'),
   refreshDatabase: document.querySelector('#refreshDatabase'),
   databaseUpdated: document.querySelector('#databaseUpdated'),
   databaseDot: document.querySelector('#databaseDot'),
@@ -62,7 +63,27 @@ const elements = {
   poolRowCount: document.querySelector('#poolRowCount'),
   storyRowCount: document.querySelector('#storyRowCount'),
   clientRowCount: document.querySelector('#clientRowCount'),
-  activityRowCount: document.querySelector('#activityRowCount')
+  activityRowCount: document.querySelector('#activityRowCount'),
+  refreshIot: document.querySelector('#refreshIot'),
+  iotUpdated: document.querySelector('#iotUpdated'),
+  iotDot: document.querySelector('#iotDot'),
+  iotMessage: document.querySelector('#iotMessage'),
+  iotListener: document.querySelector('#iotListener'),
+  iotOnline: document.querySelector('#iotOnline'),
+  iotStarted: document.querySelector('#iotStarted'),
+  iotSnapshotAge: document.querySelector('#iotSnapshotAge'),
+  iotContent: document.querySelector('#iotContent'),
+  iotConnections: document.querySelector('#iotConnections'),
+  iotDisconnections: document.querySelector('#iotDisconnections'),
+  iotRequests: document.querySelector('#iotRequests'),
+  iotStatuses: document.querySelector('#iotStatuses'),
+  iotReady: document.querySelector('#iotReady'),
+  iotErrors: document.querySelector('#iotErrors'),
+  iotAuthRejected: document.querySelector('#iotAuthRejected'),
+  iotDeviceRows: document.querySelector('#iotDeviceRows'),
+  iotActionRows: document.querySelector('#iotActionRows'),
+  iotDeviceCount: document.querySelector('#iotDeviceCount'),
+  iotActionCount: document.querySelector('#iotActionCount')
 };
 
 const state = {
@@ -78,7 +99,8 @@ const state = {
   loading: false,
   activeView: 'builder',
   databaseLoading: false,
-  databaseAudioUrl: ''
+  databaseAudioUrl: '',
+  iotLoading: false
 };
 
 function getClientId() {
@@ -531,16 +553,99 @@ async function loadDatabaseDashboard() {
   }
 }
 
+function formatDuration(milliseconds) {
+  if (!Number.isFinite(milliseconds)) return '-';
+  if (milliseconds < 1000) return `${Math.round(milliseconds)} ms`;
+  if (milliseconds < 60_000) return `${Math.round(milliseconds / 1000)} sec`;
+  return `${Math.round(milliseconds / 60_000)} min`;
+}
+
+function renderIotDashboard(data) {
+  const counters = data.counters || {};
+  elements.iotListener.textContent = `${data.host || '0.0.0.0'}:${data.port || 2215}`;
+  elements.iotOnline.textContent = String(data.connected_devices || 0);
+  elements.iotStarted.textContent = formatDate(data.started_at);
+  elements.iotSnapshotAge.textContent = formatDuration(data.status_age_ms);
+  elements.iotConnections.textContent = String(counters.connections || 0);
+  elements.iotDisconnections.textContent = `${counters.disconnections || 0} disconnected`;
+  elements.iotRequests.textContent = String(counters.story_requests || 0);
+  elements.iotStatuses.textContent = String(counters.status_messages || 0);
+  elements.iotReady.textContent = String(counters.stories_ready || 0);
+  elements.iotErrors.textContent = String(counters.story_errors || 0);
+  elements.iotAuthRejected.textContent = `${counters.auth_rejected || 0} auth rejected`;
+
+  const devices = data.devices || [];
+  elements.iotDeviceRows.replaceChildren();
+  for (const device of devices) {
+    const row = document.createElement('tr');
+    addTableCell(row, device.device_id, device.last_request_id || 'No story request');
+    const connectionCell = document.createElement('td');
+    connectionCell.append(createElement('span', `status-label${device.online ? ' ready' : ''}`, device.online ? 'Online' : 'Offline'));
+    row.append(connectionCell);
+    addTableCell(row, device.state || '-', device.detail || 'No detail');
+    addTableCell(row, device.ip || device.remote_address || '-', Number.isFinite(device.rssi) ? `${device.rssi} dBm` : 'RSSI unavailable');
+    const position = Number(device.audio_position) || 0;
+    const size = Number(device.audio_size) || 0;
+    addTableCell(row, size > 0 ? `${Math.min(100, (position / size) * 100).toFixed(1)}%` : '-', size > 0 ? `${formatBytes(position)} / ${formatBytes(size)}` : `${device.playback_round || 0} rounds`);
+    addTableCell(row, formatDate(device.last_seen_at), device.connected_at ? `Connected ${formatDate(device.connected_at)}` : '');
+    elements.iotDeviceRows.append(row);
+  }
+  if (!devices.length) emptyTable(elements.iotDeviceRows, 6, 'No MQTT terminals have connected.');
+  elements.iotDeviceCount.textContent = `${devices.length} rows`;
+
+  const actions = data.recent_actions || [];
+  elements.iotActionRows.replaceChildren();
+  for (const action of actions) {
+    const row = document.createElement('tr');
+    addTableCell(row, formatDate(action.at));
+    const actionCell = document.createElement('td');
+    actionCell.append(createElement('span', `iot-action-kind ${String(action.type || '').replaceAll('.', '-')}`, action.type || '-'));
+    row.append(actionCell);
+    addTableCell(row, action.device_id || 'Broker');
+    addTableCell(row, action.detail || '-');
+    elements.iotActionRows.append(row);
+  }
+  if (!actions.length) emptyTable(elements.iotActionRows, 4, 'No MQTT actions have been recorded.');
+  elements.iotActionCount.textContent = `${actions.length} rows`;
+}
+
+async function loadIotDashboard() {
+  if (state.iotLoading) return;
+  state.iotLoading = true;
+  elements.refreshIot.disabled = true;
+  try {
+    const data = await api('/api/iot/dashboard');
+    elements.iotUpdated.textContent = `Updated ${new Date().toLocaleTimeString('en-GB', { hour12: false })}`;
+    elements.iotDot.className = `database-dot ${data.online ? 'online' : 'error'}`;
+    elements.iotMessage.textContent = data.online
+      ? 'Broker snapshot is current and terminals can connect.'
+      : data.updated_at
+        ? 'Broker snapshot is stale or the IoT process is stopped.'
+        : 'No broker snapshot is available. Start the IoT PM2 process.';
+    elements.iotContent.hidden = false;
+    renderIotDashboard(data);
+  } catch (error) {
+    elements.iotDot.className = 'database-dot error';
+    elements.iotMessage.textContent = error.message;
+    elements.iotContent.hidden = true;
+  } finally {
+    state.iotLoading = false;
+    elements.refreshIot.disabled = false;
+  }
+}
+
 function switchView(view) {
-  state.activeView = view === 'database' ? 'database' : 'builder';
+  state.activeView = ['builder', 'database', 'iot'].includes(view) ? view : 'builder';
   elements.builderView.hidden = state.activeView !== 'builder';
   elements.databaseView.hidden = state.activeView !== 'database';
+  elements.iotView.hidden = state.activeView !== 'iot';
   for (const button of elements.viewButtons) {
     const active = button.dataset.view === state.activeView;
     button.classList.toggle('active', active);
     button.setAttribute('aria-pressed', String(active));
   }
   if (state.activeView === 'database') loadDatabaseDashboard();
+  if (state.activeView === 'iot') loadIotDashboard();
 }
 
 async function initialize() {
@@ -708,9 +813,13 @@ elements.clearLogButton.addEventListener('click', () => {
   elements.requestLog.replaceChildren(createElement('li', 'log-empty', 'No requests yet'));
 });
 for (const button of elements.viewButtons) {
-  button.addEventListener('click', () => switchView(button.dataset.view));
+  button.addEventListener('click', () => {
+    history.replaceState(null, '', `#${button.dataset.view}`);
+    switchView(button.dataset.view);
+  });
 }
 elements.refreshDatabase.addEventListener('click', loadDatabaseDashboard);
+elements.refreshIot.addEventListener('click', loadIotDashboard);
 elements.storyRows.addEventListener('click', async (event) => {
   const button = event.target.closest('[data-audio-story-id]');
   if (!button) return;
@@ -746,7 +855,11 @@ elements.databaseAudio.addEventListener('ended', () => {
 setInterval(() => {
   if (state.activeView === 'database' && !document.hidden) loadDatabaseDashboard();
 }, 30_000);
+setInterval(() => {
+  if (state.activeView === 'iot' && !document.hidden) loadIotDashboard();
+}, 3000);
 
 updateLanguageLabel();
 renderQueue();
+switchView(location.hash.slice(1) || 'builder');
 initialize();

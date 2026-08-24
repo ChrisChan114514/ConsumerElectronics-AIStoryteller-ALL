@@ -13,5 +13,6 @@ export const iotConfig = Object.freeze({
   publicAudioBaseUrl: (process.env.IOT_PUBLIC_AUDIO_BASE_URL || 'http://192.168.137.1:2210').replace(/\/+$/, ''),
   mqttUsername: process.env.IOT_MQTT_USERNAME || 'story-device',
   mqttPassword: process.env.IOT_MQTT_PASSWORD || 'story-test-2026',
-  audioDirectory: path.join(projectRoot, 'IoT', 'generated-audio')
+  audioDirectory: path.join(projectRoot, 'IoT', 'generated-audio'),
+  statusPath: path.join(projectRoot, 'IoT', 'runtime-status.json')
 });

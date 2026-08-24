@@ -32,7 +32,12 @@ chmod +x bash/start_pm2.sh bash/stop_pm2.sh
 ./bash/start_pm2.sh
 ```
 
-The startup script checks Node.js 22+, installs locked production dependencies and PM2 for the current user when missing, starts the service on port `2210`, and verifies the HTTP health endpoint before saving the PM2 process list and registering `pm2-cc.service` with systemd. `sudo` is required for the systemd registration step. On a failed health check it prints recent PM2 logs and the local TCP listener state.
+The startup script checks Node.js 22+, installs locked production dependencies and PM2 for the current user when missing, then starts two PM2 applications:
+
+- `ai-storyteller-webservice`: HTTP API and three-page control console on `2210`.
+- `ai-storyteller-iot`: authenticated MQTT device control plane on `2215`.
+
+It verifies the HTTP health endpoint and performs a real authenticated MQTT handshake before saving the PM2 process list and registering `pm2-cc.service` with systemd. `sudo` is required for the systemd registration step. On a failed check it prints recent logs for both processes and the local listener state.
 
 ## Stop and remove from startup restoration
 
@@ -41,15 +46,18 @@ cd /home/cc/Desktop/AIStoryteller/WebService
 ./bash/stop_pm2.sh
 ```
 
-The stop script removes only `ai-storyteller-webservice` from PM2 and saves the updated process list. It leaves the shared PM2 systemd unit enabled so other PM2 applications are not affected.
+The stop script removes both Storyteller processes from PM2 and saves the updated process list. It leaves the shared PM2 systemd unit enabled so other PM2 applications are not affected.
 
 ## Useful commands
 
 ```bash
 pm2 status ai-storyteller-webservice
 pm2 logs ai-storyteller-webservice
+pm2 status ai-storyteller-iot
+pm2 logs ai-storyteller-iot
 curl http://127.0.0.1:2210/api/health
+curl http://127.0.0.1:2210/api/iot/dashboard
 systemctl status pm2-cc.service
 ```
 
-If the local health check succeeds but another computer cannot open `http://<server-ip>:2210`, check the Linux firewall and any router or cloud security-group rules for inbound TCP port `2210`.
+If local checks succeed but external clients cannot connect, allow inbound TCP `2210` and `2215` in the Linux firewall and cloud security group. Port `2210` carries HTTP/audio data; `2215` carries MQTT control messages.

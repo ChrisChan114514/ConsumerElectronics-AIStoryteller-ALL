@@ -20,6 +20,7 @@
     <nav class="view-switcher" aria-label="Console views">
       <button type="button" class="active" data-view="builder" aria-pressed="true">Story Builder</button>
       <button type="button" data-view="database" aria-pressed="false">Database</button>
+      <button type="button" data-view="iot" aria-pressed="false">IoT Monitor</button>
     </nav>
     <div class="service-state" id="serviceState" role="status">
       <span class="state-dot" aria-hidden="true"></span>
@@ -235,6 +236,55 @@
         <section class="data-section" aria-labelledby="activityTitle">
           <div class="data-heading"><div><h2 id="activityTitle">Recent listening activity</h2><p>Most recent story usage events.</p></div><span id="activityRowCount">0 rows</span></div>
           <div class="table-scroll"><table><thead><tr><th>Client</th><th>Story</th><th>Play count</th><th>Last played</th></tr></thead><tbody id="activityRows"></tbody></table></div>
+        </section>
+      </section>
+    </div>
+  </main>
+
+  <main class="database-view iot-view" id="iotView" hidden>
+    <header class="database-heading">
+      <div>
+        <span class="eyebrow">MQTT / DEVICE CONTROL PLANE</span>
+        <h1>IoT activity</h1>
+        <p>Connected terminals, story commands, device feedback, and broker actions on port 2215.</p>
+      </div>
+      <div class="database-actions">
+        <span id="iotUpdated">Not checked</span>
+        <button type="button" class="button secondary" id="refreshIot">Refresh</button>
+      </div>
+    </header>
+
+    <div class="database-scroll">
+      <section class="connection-band iot-connection-band" aria-labelledby="iotConnectionTitle">
+        <div class="connection-title">
+          <span class="database-dot" id="iotDot" aria-hidden="true"></span>
+          <div><h2 id="iotConnectionTitle">MQTT broker</h2><p id="iotMessage">Checking IoT service...</p></div>
+        </div>
+        <dl class="connection-details">
+          <div><dt>Listener</dt><dd id="iotListener">-</dd></div>
+          <div><dt>Online terminals</dt><dd id="iotOnline">0</dd></div>
+          <div><dt>Started</dt><dd id="iotStarted">-</dd></div>
+          <div><dt>Snapshot age</dt><dd id="iotSnapshotAge">-</dd></div>
+        </dl>
+      </section>
+
+      <section class="database-content" id="iotContent" hidden>
+        <div class="metric-strip iot-metrics" aria-label="IoT action totals">
+          <div><span>Connections</span><strong id="iotConnections">0</strong><small id="iotDisconnections">0 disconnected</small></div>
+          <div><span>Story requests</span><strong id="iotRequests">0</strong><small>MQTT QoS 1 commands</small></div>
+          <div><span>Status messages</span><strong id="iotStatuses">0</strong><small>Terminal feedback</small></div>
+          <div><span>Audio ready</span><strong id="iotReady">0</strong><small>Completed jobs</small></div>
+          <div><span>Errors</span><strong id="iotErrors">0</strong><small id="iotAuthRejected">0 auth rejected</small></div>
+        </div>
+
+        <section class="data-section" aria-labelledby="iotDevicesTitle">
+          <div class="data-heading"><div><h2 id="iotDevicesTitle">MQTT terminals</h2><p>Current connection and latest playback feedback for every known device.</p></div><span id="iotDeviceCount">0 rows</span></div>
+          <div class="table-scroll"><table class="iot-device-table"><thead><tr><th>Device</th><th>Connection</th><th>State</th><th>Network</th><th>Playback</th><th>Last seen</th></tr></thead><tbody id="iotDeviceRows"></tbody></table></div>
+        </section>
+
+        <section class="data-section" aria-labelledby="iotActionsTitle">
+          <div class="data-heading"><div><h2 id="iotActionsTitle">Recent MQTT actions</h2><p>Newest broker, command, generation, and terminal events.</p></div><span id="iotActionCount">0 rows</span></div>
+          <div class="table-scroll"><table class="iot-action-table"><thead><tr><th>Time</th><th>Action</th><th>Device</th><th>Detail</th></tr></thead><tbody id="iotActionRows"></tbody></table></div>
         </section>
       </section>
     </div>

@@ -84,8 +84,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   min-height: 88px; padding: 17px clamp(22px, 3vw, 48px); display: flex; align-items: center;
   justify-content: space-between; gap: 24px; border-bottom: 1px solid var(--line);
 }
+.database-heading > div:first-child { min-width: 0; }
 .database-heading h1 { margin: 3px 0 0; font-size: 24px; letter-spacing: 0; }
-.database-heading p { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
+.database-heading p { margin: 4px 0 0; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
 .database-actions { display: flex; align-items: center; gap: 14px; }
 .database-actions > span { color: var(--muted); font-size: 10px; white-space: nowrap; }
 .database-scroll { flex: 1; min-height: 0; overflow: auto; scrollbar-gutter: stable; }
@@ -139,6 +140,26 @@ td small { display: block; margin-top: 2px; overflow: hidden; text-overflow: ell
 .audio-preview:hover { border-color: var(--blue); }
 .audio-preview.playing { color: white; background: var(--blue); border-color: var(--blue); }
 .empty-table td { height: 62px; color: var(--muted); text-align: center; }
+.iot-connection-band { border-bottom-color: var(--yellow); }
+.iot-device-table { min-width: 1040px; }
+.iot-device-table th:nth-child(1) { width: 20%; }
+.iot-device-table th:nth-child(2) { width: 10%; }
+.iot-device-table th:nth-child(3) { width: 15%; }
+.iot-device-table th:nth-child(4) { width: 15%; }
+.iot-device-table th:nth-child(5) { width: 18%; }
+.iot-device-table th:nth-child(6) { width: 22%; }
+.iot-action-table th:nth-child(1) { width: 18%; }
+.iot-action-table th:nth-child(2) { width: 19%; }
+.iot-action-table th:nth-child(3) { width: 24%; }
+.iot-action-table th:nth-child(4) { width: 39%; }
+.iot-action-kind {
+  display: inline-block; max-width: 100%; padding: 3px 6px; overflow: hidden;
+  border-left: 3px solid var(--blue); color: #344a59; background: #edf4f8;
+  font-size: 9px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap;
+}
+.iot-action-kind.story-ready { border-color: var(--green); color: var(--green-dark); background: #eaf5f0; }
+.iot-action-kind.story-error, .iot-action-kind.device-auth_rejected { border-color: var(--coral); color: #864033; background: #faefed; }
+.iot-action-kind.device-status { border-color: #8b6b2f; color: #69501f; background: #faf5e8; }
 
 .pane-heading {
   min-height: 79px;
@@ -339,8 +360,13 @@ dialog pre { margin: 0; padding: 24px; overflow: auto; white-space: pre-wrap; co
   .brand div span { display: none; }
   .service-state { max-width: 145px; overflow: hidden; text-overflow: ellipsis; }
   .topbar { height: auto; min-height: 64px; flex-wrap: wrap; }
-  .view-switcher { order: 3; width: 100%; height: 40px; justify-content: center; }
-  .view-switcher button { flex: 1; }
+  .view-switcher {
+    order: 3; width: calc(100% + 30px); height: 40px; margin-inline: -15px;
+    flex: 0 0 calc(100% + 30px); justify-content: center;
+  }
+  .view-switcher button { min-width: 0; padding-inline: 7px; flex: 1; font-size: 11px; }
+  .service-state { max-width: none; }
+  .service-state #serviceStateText { display: none; }
   .workspace, .database-view { min-height: calc(100vh - 104px); }
   .pane-heading { padding: 17px 16px; }
   .pane-heading h1, .pane-heading h2 { font-size: 20px; }
@@ -364,6 +390,7 @@ dialog pre { margin: 0; padding: 24px; overflow: auto; white-space: pre-wrap; co
   .request-log li { grid-template-columns: 54px minmax(0, 1fr); }
   .request-log li em { grid-column: 2; }
   .database-heading { align-items: flex-start; flex-direction: column; }
+  .database-heading > div:first-child { width: 100%; }
   .database-actions { width: 100%; justify-content: space-between; }
   .connection-details { grid-template-columns: repeat(2, 1fr); }
   .metric-strip { grid-template-columns: repeat(2, 1fr); }

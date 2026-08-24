@@ -15,7 +15,9 @@ npm.cmd test
 npm.cmd start
 ```
 
-Open `http://localhost:2210`. Credentials are kept together under `APIkey/`. The service reads `APIkey/DeepseekAPI.txt` and `APIkey/Doubao_TTS.txt` automatically. Environment variables can override either file when needed.
+Open a second PowerShell window and run `npm.cmd run iot:start` from `WebService` to start the MQTT control plane on port `2215`.
+
+Open `http://localhost:2210`. The console contains Story Builder, Database, and IoT Monitor views. IoT Monitor reads the broker snapshot and refreshes every three seconds. Credentials are kept together under `APIkey/`. The service reads `APIkey/DeepseekAPI.txt` and `APIkey/Doubao_TTS.txt` automatically. Environment variables can override either file when needed.
 
 The default speech resource is `seed-tts-2.0` with the bilingual `vivi 2.0` voice (`zh_female_vv_uranus_bigtts`) at 24kHz. The control console can synthesize, play, and download the current story as MP3.
 
@@ -31,6 +33,7 @@ Stories, MP3 audio, PC test-client/device-client records, and playback history a
 - `GET /api/config`: public model, language, length, and card-limit settings.
 - `GET /api/cards`: all 128 bilingual cards and 16 categories.
 - `GET /api/database/dashboard`: MySQL connection details, pool/story/audio/client totals, and recent activity for the database console.
+- `GET /api/iot/dashboard`: MQTT listener health, terminal states, counters, and recent IoT actions.
 - `GET /api/database/stories/:storyId/audio`: play a stored MP3 from the database console without changing client history.
 - `POST /api/stories/preview`: validate a request and return its LLM messages without calling DeepSeek.
 - `POST /api/stories/generate`: generate or select a story pool entry. Returns `cache_status` and `story_id`.

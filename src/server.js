@@ -4,6 +4,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { config, projectRoot } from './config.js';
 import { serveGeneratedAudio } from '../IoT/audioStore.js';
+import { readIoTRuntimeStatus } from '../IoT/runtimeStatus.js';
 import { CARD_CATALOG, CARD_CATEGORIES } from './cards.js';
 import { createChatCompletion, LlmError } from './llm.js';
 import { buildStoryMessages, getLengthOptions, normalizeStoryRequest, ValidationError } from './story.js';
@@ -118,10 +119,15 @@ async function serveStatic(requestPath, response, headOnly = false) {
   }
 }
 
-async function handleApi(request, response, pathname, requestId, storyDatabase) {
+async function handleApi(request, response, pathname, requestId, storyDatabase, iotStatusPath) {
   const iotAudioMatch = pathname.match(/^\/api\/iot\/audio\/([A-Za-z0-9_-]{1,80})\.mp3$/);
   if (['GET', 'HEAD'].includes(request.method) && iotAudioMatch) {
     await serveGeneratedAudio(request, response, iotAudioMatch[1]);
+    return true;
+  }
+
+  if (request.method === 'GET' && pathname === '/api/iot/dashboard') {
+    sendJson(response, 200, await readIoTRuntimeStatus(iotStatusPath));
     return true;
   }
 
@@ -343,7 +349,7 @@ async function handleApi(request, response, pathname, requestId, storyDatabase) 
   return false;
 }
 
-export function createServer({ storyDatabase = new StoryDatabase(config.database) } = {}) {
+export function createServer({ storyDatabase = new StoryDatabase(config.database), iotStatusPath } = {}) {
   return http.createServer(async (request, response) => {
     const requestId = request.headers['x-request-id'] || crypto.randomUUID();
     applyCommonHeaders(response, requestId);
@@ -357,7 +363,7 @@ export function createServer({ storyDatabase = new StoryDatabase(config.database
     const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
     try {
       if (url.pathname.startsWith('/api/')) {
-        const handled = await handleApi(request, response, url.pathname, requestId, storyDatabase);
+        const handled = await handleApi(request, response, url.pathname, requestId, storyDatabase, iotStatusPath);
         if (!handled) sendJson(response, 404, { error: { code: 'NOT_FOUND', message: '接口不存在' }, request_id: requestId });
         return;
       }

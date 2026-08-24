@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/main.js",
+    "iot:check-public": "node IoT/check-public-mqtt.js",
     "iot:simulate": "node IoT/simulate-device.js",
     "iot:start": "node IoT/main.js",
     "iot:test": "node --test IoT/*.test.js",
