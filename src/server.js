@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import { config, projectRoot } from './config.js';
+import { serveGeneratedAudio } from '../IoT/audioStore.js';
 import { CARD_CATALOG, CARD_CATEGORIES } from './cards.js';
 import { createChatCompletion, LlmError } from './llm.js';
 import { buildStoryMessages, getLengthOptions, normalizeStoryRequest, ValidationError } from './story.js';
@@ -118,6 +119,12 @@ async function serveStatic(requestPath, response, headOnly = false) {
 }
 
 async function handleApi(request, response, pathname, requestId, storyDatabase) {
+  const iotAudioMatch = pathname.match(/^\/api\/iot\/audio\/([A-Za-z0-9_-]{1,80})\.mp3$/);
+  if (['GET', 'HEAD'].includes(request.method) && iotAudioMatch) {
+    await serveGeneratedAudio(request, response, iotAudioMatch[1]);
+    return true;
+  }
+
   if (request.method === 'GET' && pathname === '/api/health') {
     const database = await databaseStatus(storyDatabase);
     sendJson(response, 200, {

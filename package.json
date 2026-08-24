@@ -6,6 +6,9 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/main.js",
+    "iot:simulate": "node IoT/simulate-device.js",
+    "iot:start": "node IoT/main.js",
+    "iot:test": "node --test IoT/*.test.js",
     "start": "node src/main.js",
     "test": "node --test"
   },
@@ -13,6 +16,8 @@
     "node": ">=22"
   },
   "dependencies": {
+    "aedes": "^1.1.1",
+    "mqtt": "^5.15.2",
     "mysql2": "^3.14.3"
   }
 }
