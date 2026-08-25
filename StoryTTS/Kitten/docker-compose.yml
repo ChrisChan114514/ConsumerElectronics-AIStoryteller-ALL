@@ -1,0 +1,12 @@
+services:
+  kitten:
+    build: .
+    ports:
+      - "8000:8000"
+    gpus: all
+    environment:
+      KITTENTTS_BACKEND: cuda
+      KITTENTTS_MODEL: KittenML/kitten-tts-mini-0.8
+      MAX_CONCURRENCY: 2
+      TTS_API_KEY: ""
+    restart: unless-stopped

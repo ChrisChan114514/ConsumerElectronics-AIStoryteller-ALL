@@ -33,6 +33,15 @@ const elements = {
   promptDialog: document.querySelector('#promptDialog'),
   promptContent: document.querySelector('#promptContent'),
   closeDialogButton: document.querySelector('#closeDialogButton'),
+  storyDetailDialog: document.querySelector('#storyDetailDialog'),
+  closeStoryDetailButton: document.querySelector('#closeStoryDetailButton'),
+  storyDetailTitle: document.querySelector('#storyDetailTitle'),
+  storyDetailMeta: document.querySelector('#storyDetailMeta'),
+  storyDetailText: document.querySelector('#storyDetailText'),
+  storyDetailAudioMeta: document.querySelector('#storyDetailAudioMeta'),
+  storyDetailAudio: document.querySelector('#storyDetailAudio'),
+  storyDetailDownload: document.querySelector('#storyDetailDownload'),
+  storyDetailDelivery: document.querySelector('#storyDetailDelivery'),
   requestLog: document.querySelector('#requestLog'),
   clearLogButton: document.querySelector('#clearLogButton'),
   viewButtons: document.querySelectorAll('[data-view]'),
@@ -100,6 +109,7 @@ const state = {
   activeView: 'builder',
   databaseLoading: false,
   databaseAudioUrl: '',
+  storyDetailAudioUrl: '',
   iotLoading: false
 };
 
@@ -366,7 +376,7 @@ function setLoading(loading) {
 function addLog(status, cards, detail) {
   if (elements.requestLog.querySelector('.log-empty')) elements.requestLog.replaceChildren();
   const item = createElement('li', status);
-  const time = createElement('time', '', new Date().toLocaleTimeString('en-GB', { hour12: false }));
+  const time = createElement('time', '', formatTime(new Date()));
   const text = createElement('span', '', cards.map((card) => card.en).join(' + '));
   const metadata = createElement('em', '', detail);
   item.append(time, text, metadata);
@@ -396,10 +406,23 @@ function updateLanguageLabel() {
     : 'Generate English story & audio';
 }
 
+const DISPLAY_TIME_ZONE = 'Asia/Shanghai';
+
+function formatTime(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleTimeString('en-GB', {
+    hour12: false,
+    timeZone: DISPLAY_TIME_ZONE
+  });
+}
+
 function formatDate(value) {
   if (!value) return 'Never';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('en-GB', { hour12: false });
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('en-GB', {
+    hour12: false,
+    timeZone: DISPLAY_TIME_ZONE
+  });
 }
 
 function formatBytes(value) {
@@ -469,7 +492,14 @@ function renderDatabaseDashboard(data) {
   elements.storyRows.replaceChildren();
   for (const story of stories) {
     const row = document.createElement('tr');
-    addTableCell(row, story.title, `${story.story_id.slice(0, 8)} · ${story.preview}`);
+    row.dataset.storyId = story.story_id;
+    row.tabIndex = 0;
+    const storyCell = document.createElement('td');
+    const storyButton = createElement('button', 'story-link', story.title);
+    storyButton.type = 'button';
+    storyButton.dataset.storyId = story.story_id;
+    storyCell.append(storyButton, createElement('small', '', `${story.story_id.slice(0, 8)} · ${story.preview}`));
+    row.append(storyCell);
     const cards = document.createElement('td');
     cards.append(cardTags(story.card_ids));
     row.append(cards);
@@ -520,6 +550,98 @@ function renderDatabaseDashboard(data) {
   elements.activityRowCount.textContent = `${activity.length} rows`;
 }
 
+function clearStoryDetailAudio() {
+  elements.storyDetailAudio.pause();
+  elements.storyDetailAudio.removeAttribute('src');
+  elements.storyDetailAudio.hidden = true;
+  elements.storyDetailDownload.removeAttribute('href');
+  elements.storyDetailDownload.hidden = true;
+}
+
+function renderStoryDetailText(text) {
+  const normalized = String(text || '').replace(/\r\n/g, '\n').trim();
+  const lines = normalized.split('\n');
+  const title = (lines.shift() || 'Untitled story').replace(/^#+\s*/, '').trim();
+  const body = lines.join('\n').trim();
+  const paragraphs = body.split(/\n\s*\n/).map((paragraph) => paragraph.replace(/\n/g, ' ').trim()).filter(Boolean);
+  elements.storyDetailTitle.textContent = title;
+  elements.storyDetailText.replaceChildren();
+  for (const paragraph of paragraphs.length ? paragraphs : [body || normalized]) {
+    elements.storyDetailText.append(createElement('p', '', paragraph));
+  }
+}
+
+function detailFact(label, value) {
+  const fact = createElement('div', 'story-detail-fact');
+  fact.append(createElement('dt', '', label), createElement('dd', '', value || '-'));
+  return fact;
+}
+
+function renderStoryDetail(detail) {
+  const story = detail.story || {};
+  const delivery = detail.delivery || {};
+  const generated = delivery.generated_audio;
+  renderStoryDetailText(story.story_text);
+  elements.storyDetailMeta.replaceChildren();
+  const meta = [
+    `ID ${story.story_id || '-'}`,
+    `${(story.card_ids || []).length}-card story`,
+    story.language || 'en-US',
+    `Created ${formatDate(story.created_at)}`,
+    `${story.listeners || 0} listeners / ${story.plays || 0} plays`
+  ];
+  for (const value of meta) elements.storyDetailMeta.append(createElement('span', '', value));
+
+  clearStoryDetailAudio();
+  if (story.audio?.endpoint) {
+    elements.storyDetailAudio.src = story.audio.endpoint;
+    elements.storyDetailAudio.hidden = false;
+    elements.storyDetailDownload.href = story.audio.endpoint;
+    elements.storyDetailDownload.hidden = false;
+    elements.storyDetailAudioMeta.textContent = `${story.audio.provider || 'Audio'} · ${formatBytes(story.audio.bytes)} · ${formatDate(story.audio.created_at)}`;
+  } else {
+    elements.storyDetailAudioMeta.textContent = 'No audio has been generated for this story.';
+  }
+
+  elements.storyDetailDelivery.replaceChildren();
+  const deliveryFacts = document.createElement('dl');
+  deliveryFacts.className = 'story-detail-facts';
+  deliveryFacts.append(
+    detailFact('Request ID', delivery.mqtt?.request_id),
+    detailFact('Device', delivery.mqtt?.device_id),
+    detailFact('Generated audio', generated ? `${generated.audio_id} · ${formatBytes(generated.bytes)}` : 'Not found'),
+    detailFact('MQTT snapshot', delivery.mqtt?.status_available ? 'Available' : 'Unavailable or stale')
+  );
+  elements.storyDetailDelivery.append(deliveryFacts);
+
+  const events = delivery.mqtt?.events || [];
+  const eventList = createElement('ol', 'story-delivery-events');
+  for (const event of events) {
+    const item = document.createElement('li');
+    item.append(createElement('time', '', formatDate(event.at)), createElement('strong', '', event.type || '-'), createElement('span', '', event.detail || '-'));
+    eventList.append(item);
+  }
+  if (!events.length) eventList.append(createElement('li', 'empty-delivery', 'No matching MQTT delivery events in the current runtime window.'));
+  elements.storyDetailDelivery.append(eventList);
+}
+
+async function openStoryDetail(storyId) {
+  elements.storyDetailTitle.textContent = 'Loading story details...';
+  elements.storyDetailText.replaceChildren();
+  elements.storyDetailMeta.replaceChildren();
+  elements.storyDetailDelivery.replaceChildren();
+  clearStoryDetailAudio();
+  elements.storyDetailAudioMeta.textContent = 'Loading audio metadata...';
+  elements.storyDetailDialog.showModal();
+  try {
+    renderStoryDetail(await api(`/api/database/stories/${encodeURIComponent(storyId)}`));
+  } catch (error) {
+    elements.storyDetailTitle.textContent = 'Unable to load story';
+    elements.storyDetailText.append(createElement('p', '', error.message));
+    elements.storyDetailAudioMeta.textContent = 'Audio details unavailable.';
+  }
+}
+
 async function loadDatabaseDashboard() {
   if (state.databaseLoading) return;
   state.databaseLoading = true;
@@ -532,7 +654,7 @@ async function loadDatabaseDashboard() {
     elements.databaseName.textContent = data.server?.database_name || data.connection.database;
     elements.databaseVersion.textContent = data.server?.version || '-';
     elements.databaseTime.textContent = formatDate(data.server?.server_time);
-    elements.databaseUpdated.textContent = `Updated ${new Date().toLocaleTimeString('en-GB', { hour12: false })}`;
+    elements.databaseUpdated.textContent = `Updated ${formatTime(new Date())} UTC+8`;
     if (!data.connected) {
       elements.databaseDot.className = 'database-dot error';
       elements.databaseMessage.textContent = data.error?.message || data.message || 'Database unavailable.';
@@ -615,7 +737,7 @@ async function loadIotDashboard() {
   elements.refreshIot.disabled = true;
   try {
     const data = await api('/api/iot/dashboard');
-    elements.iotUpdated.textContent = `Updated ${new Date().toLocaleTimeString('en-GB', { hour12: false })}`;
+    elements.iotUpdated.textContent = `Updated ${formatTime(new Date())} UTC+8`;
     elements.iotDot.className = `database-dot ${data.online ? 'online' : 'error'}`;
     elements.iotMessage.textContent = data.online
       ? 'Broker snapshot is current and terminals can connect.'
@@ -822,35 +944,51 @@ elements.refreshDatabase.addEventListener('click', loadDatabaseDashboard);
 elements.refreshIot.addEventListener('click', loadIotDashboard);
 elements.storyRows.addEventListener('click', async (event) => {
   const button = event.target.closest('[data-audio-story-id]');
-  if (!button) return;
-  document.querySelectorAll('.audio-preview.playing').forEach((item) => item.classList.remove('playing'));
-  button.disabled = true;
-  button.textContent = 'Loading...';
-  try {
-    const response = await fetch(`/api/database/stories/${button.dataset.audioStoryId}/audio`);
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      throw new Error(body.error?.message || 'Unable to load cached audio.');
+  if (button) {
+    document.querySelectorAll('.audio-preview.playing').forEach((item) => item.classList.remove('playing'));
+    button.disabled = true;
+    button.textContent = 'Loading...';
+    try {
+      const response = await fetch(`/api/database/stories/${button.dataset.audioStoryId}/audio`);
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error?.message || 'Unable to load cached audio.');
+      }
+      if (state.databaseAudioUrl) URL.revokeObjectURL(state.databaseAudioUrl);
+      state.databaseAudioUrl = URL.createObjectURL(await response.blob());
+      elements.databaseAudio.src = state.databaseAudioUrl;
+      elements.databaseAudio.hidden = false;
+      button.classList.add('playing');
+      button.textContent = 'Playing';
+      await elements.databaseAudio.play();
+    } catch (error) {
+      elements.databaseMessage.textContent = error.message;
+    } finally {
+      button.disabled = false;
+      if (!button.classList.contains('playing')) button.textContent = 'Play audio';
     }
-    if (state.databaseAudioUrl) URL.revokeObjectURL(state.databaseAudioUrl);
-    state.databaseAudioUrl = URL.createObjectURL(await response.blob());
-    elements.databaseAudio.src = state.databaseAudioUrl;
-    elements.databaseAudio.hidden = false;
-    button.classList.add('playing');
-    button.textContent = 'Playing';
-    await elements.databaseAudio.play();
-  } catch (error) {
-    elements.databaseMessage.textContent = error.message;
-  } finally {
-    button.disabled = false;
-    if (!button.classList.contains('playing')) button.textContent = 'Play audio';
+    return;
   }
+
+  const target = event.target.closest('[data-story-id]');
+  if (target) openStoryDetail(target.dataset.storyId);
+});
+elements.storyRows.addEventListener('keydown', (event) => {
+  if (!['Enter', ' '].includes(event.key)) return;
+  const row = event.target.closest('tr[data-story-id]');
+  if (!row || event.target.closest('button')) return;
+  event.preventDefault();
+  openStoryDetail(row.dataset.storyId);
 });
 elements.databaseAudio.addEventListener('ended', () => {
   document.querySelectorAll('.audio-preview.playing').forEach((button) => {
     button.classList.remove('playing');
     button.textContent = 'Play audio';
   });
+});
+elements.closeStoryDetailButton.addEventListener('click', () => elements.storyDetailDialog.close());
+elements.storyDetailDialog.addEventListener('click', (event) => {
+  if (event.target === elements.storyDetailDialog) elements.storyDetailDialog.close();
 });
 setInterval(() => {
   if (state.activeView === 'database' && !document.hidden) loadDatabaseDashboard();

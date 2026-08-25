@@ -150,6 +150,8 @@ export HOST="0.0.0.0"
 export PORT="${SERVICE_PORT}"
 export IOT_HOST="0.0.0.0"
 export IOT_MQTT_PORT="${IOT_PORT}"
+export IOT_WEB_SERVICE_URL="${IOT_WEB_SERVICE_URL:-http://127.0.0.1:${SERVICE_PORT}}"
+export IOT_PUBLIC_AUDIO_BASE_URL="${IOT_PUBLIC_AUDIO_BASE_URL:-http://120.26.111.75:${SERVICE_PORT}}"
 
 node_bin="$(command -v node)"
 pm2_bin="$(command -v pm2)"

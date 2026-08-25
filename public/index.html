@@ -290,6 +290,29 @@
     </div>
   </main>
 
+  <dialog id="storyDetailDialog">
+    <div class="dialog-header">
+      <div><span class="eyebrow">STORY RECORD / UTC+8</span><h2 id="storyDetailTitle">Story details</h2></div>
+      <button type="button" class="close-button" id="closeStoryDetailButton" aria-label="Close story details">&times;</button>
+    </div>
+    <div class="story-detail-body">
+      <div class="story-detail-meta" id="storyDetailMeta"></div>
+      <section class="story-detail-section" aria-labelledby="storyDetailTextHeading">
+        <div class="data-heading"><div><h3 id="storyDetailTextHeading">Story text</h3><p>Full English story content stored for this record.</p></div></div>
+        <div class="story-detail-text" id="storyDetailText"></div>
+      </section>
+      <section class="story-detail-section" aria-labelledby="storyDetailAudioHeading">
+        <div class="data-heading"><div><h3 id="storyDetailAudioHeading">Audio</h3><p id="storyDetailAudioMeta">No audio record.</p></div></div>
+        <audio id="storyDetailAudio" controls preload="metadata" hidden></audio>
+        <a class="download-audio" id="storyDetailDownload" download="story.mp3" hidden>Download MP3</a>
+      </section>
+      <section class="story-detail-section" aria-labelledby="storyDetailDeliveryHeading">
+        <div class="data-heading"><div><h3 id="storyDetailDeliveryHeading">IoT delivery</h3><p>MQTT request, generated audio, and terminal event history.</p></div></div>
+        <div class="story-delivery-grid" id="storyDetailDelivery"></div>
+      </section>
+    </div>
+  </dialog>
+
   <dialog id="promptDialog">
     <div class="dialog-header">
       <div><span class="eyebrow">REQUEST PREVIEW</span><h2>Final prompt</h2></div>

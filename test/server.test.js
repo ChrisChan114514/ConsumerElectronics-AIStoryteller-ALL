@@ -110,6 +110,21 @@ test('serves database inventory and stored audio to the second console view', as
     async getAudio(storyId) {
       assert.equal(storyId, '12345678-1234-1234-1234-123456789abc');
       return { audio: cachedAudio, contentType: 'audio/mpeg', format: 'mp3', model: 'cached-model', taskId: 'dashboard', latencyMs: 0, cached: true };
+    },
+    async getStoryDetails(storyId) {
+      assert.equal(storyId, '12345678-1234-1234-1234-123456789abc');
+      return {
+        story_id: storyId,
+        language: 'en-US',
+        card_ids: ['C003'],
+        story_text: 'A Test Story.\n\nThe complete story text.',
+        child_age: 4,
+        model: 'cached-model',
+        created_at: '2026-08-23T00:00:00.000Z',
+        listeners: 1,
+        plays: 2,
+        audio: { provider: 'cached', bytes: cachedAudio.length, endpoint: `/api/database/stories/${storyId}/audio` }
+      };
     }
   };
   const server = createServer({ storyDatabase });
@@ -129,6 +144,13 @@ test('serves database inventory and stored audio to the second console view', as
     assert.equal(audioResponse.status, 200);
     assert.equal(audioResponse.headers.get('x-tts-cached'), 'true');
     assert.deepEqual(Buffer.from(await audioResponse.arrayBuffer()), cachedAudio);
+
+    const detailResponse = await fetch(`${baseUrl}/api/database/stories/12345678-1234-1234-1234-123456789abc`);
+    const detail = await detailResponse.json();
+    assert.equal(detailResponse.status, 200);
+    assert.equal(detail.story.story_text, 'A Test Story.\n\nThe complete story text.');
+    assert.equal(detail.story.audio.bytes, cachedAudio.length);
+    assert.equal(detail.delivery.mqtt.status_available, false);
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }

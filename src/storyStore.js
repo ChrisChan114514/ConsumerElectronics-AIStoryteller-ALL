@@ -222,6 +222,52 @@ export class StoryDatabase {
     };
   }
 
+  async getStoryDetails(storyId) {
+    await this.initialize();
+    const [rows] = await this.pool.execute(
+      `SELECT s.story_id, s.language, s.card_ids, s.story_text, s.child_age, s.model,
+          s.usage_json, s.created_at,
+          a.provider AS audio_provider, a.model AS audio_model, a.voice AS audio_voice,
+          a.audio_format, a.sample_rate, a.byte_length AS audio_bytes, a.created_at AS audio_created_at,
+          COALESCE(h.listeners, 0) AS listeners, COALESCE(h.plays, 0) AS plays,
+          h.last_played_at
+       FROM stories s
+       LEFT JOIN story_audio a ON a.story_id = s.story_id
+       LEFT JOIN (
+         SELECT story_id, COUNT(*) AS listeners, SUM(play_count) AS plays, MAX(last_played_at) AS last_played_at
+         FROM story_history GROUP BY story_id
+       ) h ON h.story_id = s.story_id
+       WHERE s.story_id = ?
+       LIMIT 1`,
+      [storyId]
+    );
+    if (!rows[0]) return null;
+    const row = rows[0];
+    return {
+      story_id: row.story_id,
+      language: row.language,
+      card_ids: typeof row.card_ids === 'string' ? JSON.parse(row.card_ids) : row.card_ids,
+      story_text: row.story_text,
+      child_age: row.child_age,
+      model: row.model,
+      usage: typeof row.usage_json === 'string' ? JSON.parse(row.usage_json) : row.usage_json,
+      created_at: row.created_at,
+      listeners: Number(row.listeners || 0),
+      plays: Number(row.plays || 0),
+      last_played_at: row.last_played_at,
+      audio: row.audio_bytes == null ? null : {
+        provider: row.audio_provider,
+        model: row.audio_model,
+        voice: row.audio_voice,
+        format: row.audio_format,
+        sample_rate: row.sample_rate,
+        bytes: Number(row.audio_bytes),
+        created_at: row.audio_created_at,
+        endpoint: `/api/database/stories/${row.story_id}/audio`
+      }
+    };
+  }
+
   async saveAudio(storyId, speech, ttsConfig) {
     await this.initialize();
     await this.pool.execute(

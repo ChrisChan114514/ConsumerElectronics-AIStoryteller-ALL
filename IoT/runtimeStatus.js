@@ -174,7 +174,10 @@ export class IoTRuntimeStatus {
   storyEvent(deviceId, event) {
     if (event.type === 'story.ready') this.counters.stories_ready += 1;
     if (event.type === 'story.error') this.counters.story_errors += 1;
-    this.action(event.type, deviceId, event.request_id || event.message || '');
+    const detail = [event.request_id, event.story_id, event.audio_path, event.code, event.message]
+      .filter(Boolean)
+      .join(' ');
+    this.action(event.type, deviceId, detail);
     this.schedulePersist();
   }
 

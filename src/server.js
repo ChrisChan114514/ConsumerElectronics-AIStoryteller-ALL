@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import { config, projectRoot } from './config.js';
+import { iotConfig } from '../IoT/config.js';
 import { serveGeneratedAudio } from '../IoT/audioStore.js';
 import { readIoTRuntimeStatus } from '../IoT/runtimeStatus.js';
 import { CARD_CATALOG, CARD_CATEGORIES } from './cards.js';
@@ -13,6 +14,7 @@ import { createPoolIdentity, normalizeClient, StoryDatabase, StoryDatabaseError 
 
 const publicRoot = path.join(projectRoot, 'public');
 const maximumBodySize = 64 * 1024;
+const storyIdPattern = /^[0-9a-f-]{36}$/i;
 const mimeTypes = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
@@ -119,6 +121,57 @@ async function serveStatic(requestPath, response, headOnly = false) {
   }
 }
 
+async function findGeneratedAudio(storyId) {
+  let entries;
+  try {
+    entries = await fs.readdir(iotConfig.audioDirectory, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }
+
+  const matches = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith('.mp3.json')) continue;
+    try {
+      const metadata = JSON.parse(await fs.readFile(path.join(iotConfig.audioDirectory, entry.name), 'utf8'));
+      if (metadata.story_id !== storyId) continue;
+      const audioId = entry.name.slice(0, -'.mp3.json'.length);
+      matches.push({
+        audio_id: audioId,
+        request_id: metadata.request_id || '',
+        device_id: metadata.device_id || '',
+        card_ids: metadata.card_ids || [],
+        language: metadata.language || 'en-US',
+        bytes: Number(metadata.bytes || 0),
+        created_at: metadata.created_at || null,
+        endpoint: `/api/iot/audio/${audioId}.mp3`
+      });
+    } catch {
+      // Ignore an incomplete metadata file while the IoT service is writing it.
+    }
+  }
+  return matches.sort((left, right) => String(right.created_at || '').localeCompare(String(left.created_at || '')))[0] || null;
+}
+
+async function buildStoryDelivery(story, iotStatusPath) {
+  const generatedAudio = await findGeneratedAudio(story.story_id);
+  const runtime = await readIoTRuntimeStatus(iotStatusPath);
+  const requestId = generatedAudio?.request_id || '';
+  const events = requestId
+    ? (runtime.recent_actions || []).filter((action) => String(action.detail || '').includes(requestId))
+    : [];
+  return {
+    generated_audio: generatedAudio,
+    mqtt: {
+      request_id: requestId,
+      device_id: generatedAudio?.device_id || '',
+      events,
+      status_available: Boolean(runtime.updated_at && !runtime.stale)
+    }
+  };
+}
+
 async function handleApi(request, response, pathname, requestId, storyDatabase, iotStatusPath) {
   const iotAudioMatch = pathname.match(/^\/api\/iot\/audio\/([A-Za-z0-9_-]{1,80})\.mp3$/);
   if (['GET', 'HEAD'].includes(request.method) && iotAudioMatch) {
@@ -192,6 +245,38 @@ async function handleApi(request, response, pathname, requestId, storyDatabase, 
         error: { code: error.code || 'MYSQL_CONNECTION_ERROR', message: error.message }
       });
     }
+    return true;
+  }
+
+  const databaseStoryMatch = pathname.match(/^\/api\/database\/stories\/([^/]+)$/i);
+  if (request.method === 'GET' && databaseStoryMatch) {
+    if (!storyDatabase.configured) {
+      sendJson(response, 503, { error: { code: 'DATABASE_DISABLED', message: 'MySQL is disabled.' }, request_id: requestId });
+      return true;
+    }
+    if (!storyIdPattern.test(databaseStoryMatch[1])) {
+      sendJson(response, 400, { error: { code: 'INVALID_STORY_ID', message: 'Story ID must be a UUID.' }, request_id: requestId });
+      return true;
+    }
+    const story = await storyDatabase.getStoryDetails(databaseStoryMatch[1]);
+    if (!story) {
+      sendJson(response, 404, { error: { code: 'STORY_NOT_FOUND', message: 'Story was not found.' }, request_id: requestId });
+      return true;
+    }
+    const delivery = await buildStoryDelivery(story, iotStatusPath);
+    if (!story.audio && delivery.generated_audio) {
+      story.audio = {
+        provider: 'iot-generated',
+        model: null,
+        voice: null,
+        format: 'mp3',
+        sample_rate: null,
+        bytes: delivery.generated_audio.bytes,
+        created_at: delivery.generated_audio.created_at,
+        endpoint: delivery.generated_audio.endpoint
+      };
+    }
+    sendJson(response, 200, { story, delivery });
     return true;
   }
 

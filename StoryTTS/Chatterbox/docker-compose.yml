@@ -1,0 +1,14 @@
+services:
+  chatterbox:
+    build: .
+    ports:
+      - "8001:8000"
+    gpus: all
+    environment:
+      CHATTERBOX_DEVICE: cuda
+      VOICE_PROMPT: /app/voices/narrator.wav
+      MAX_CONCURRENCY: 1
+      TTS_API_KEY: ""
+    volumes:
+      - ./voices:/app/voices:ro
+    restart: unless-stopped
