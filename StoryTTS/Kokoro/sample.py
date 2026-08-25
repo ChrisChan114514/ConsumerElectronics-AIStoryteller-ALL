@@ -9,7 +9,7 @@ import httpx
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base-url", default="http://127.0.0.1:8880/v1")
+    parser.add_argument("--base-url", default="http://127.0.0.1:2221/v1")
     parser.add_argument("--voice", default="af_heart", help="Kokoro voice id")
     parser.add_argument("--output", default="samples/kokoro_story.wav")
     args = parser.parse_args()

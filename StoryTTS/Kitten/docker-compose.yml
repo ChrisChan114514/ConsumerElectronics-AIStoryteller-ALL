@@ -2,7 +2,7 @@ services:
   kitten:
     build: .
     ports:
-      - "8000:8000"
+      - "2222:2222"
     gpus: all
     environment:
       KITTENTTS_BACKEND: cuda

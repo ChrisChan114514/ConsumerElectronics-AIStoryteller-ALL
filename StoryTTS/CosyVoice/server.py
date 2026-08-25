@@ -25,7 +25,7 @@ class SpeechRequest(BaseModel):
 
 
 app = FastAPI(title="CosyVoice3 RTX 5060 gateway")
-UPSTREAM = os.getenv("COSYVOICE_URL", "http://127.0.0.1:50000").rstrip("/")
+UPSTREAM = os.getenv("COSYVOICE_URL", "http://127.0.0.1:2225").rstrip("/")
 PROMPT_WAV = Path(os.getenv("VOICE_PROMPT", "/app/voices/narrator.wav"))
 SAMPLE_RATE = int(os.getenv("COSYVOICE_SAMPLE_RATE", "24000"))
 MAX_CONCURRENCY = max(1, int(os.getenv("MAX_CONCURRENCY", "1")))

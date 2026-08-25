@@ -15,7 +15,7 @@ run_levels() {
   done
 }
 
-run_levels Kokoro "http://127.0.0.1:8880/v1" 32 1 2 4 8
-run_levels Kitten "http://127.0.0.1:8000/v1" 32 1 2 4 8
-run_levels Chatterbox "http://127.0.0.1:8001/v1" 16 1 2 4
-run_levels CosyVoice "http://127.0.0.1:8002/v1" 16 1 2 4
+run_levels Kokoro "http://127.0.0.1:2221/v1" 32 1 2 4 8
+run_levels Kitten "http://127.0.0.1:2222/v1" 32 1 2 4 8
+run_levels Chatterbox "http://127.0.0.1:2223/v1" 16 1 2 4
+run_levels CosyVoice "http://127.0.0.1:2224/v1" 16 1 2 4

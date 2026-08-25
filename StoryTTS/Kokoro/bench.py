@@ -61,7 +61,7 @@ async def run(args: argparse.Namespace) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base-url", default="http://127.0.0.1:8880/v1")
+    parser.add_argument("--base-url", default="http://127.0.0.1:2221/v1")
     parser.add_argument("--voice", default="af_heart")
     parser.add_argument("--concurrency", type=int, default=4)
     parser.add_argument("--requests", type=int, default=32)

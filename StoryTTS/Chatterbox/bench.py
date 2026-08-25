@@ -58,7 +58,7 @@ async def run(args: argparse.Namespace) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base-url", default="http://127.0.0.1:8001/v1")
+    parser.add_argument("--base-url", default="http://127.0.0.1:2223/v1")
     parser.add_argument("--concurrency", type=int, default=2)
     parser.add_argument("--server-slots", type=int, default=1, help="document the MAX_CONCURRENCY used by the server")
     parser.add_argument("--requests", type=int, default=16)

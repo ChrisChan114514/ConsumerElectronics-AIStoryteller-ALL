@@ -22,3 +22,5 @@
 DeepInfra: [deepinfra.com/hexgrad/Kokoro-82M](https://deepinfra.com/hexgrad/Kokoro-82M)
 
 Together AI：[www.together.ai/models/kokoro-82m](https://www.together.ai/models/kokoro-82m)
+
+Hugging face介绍：[huggingface.co/hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M)

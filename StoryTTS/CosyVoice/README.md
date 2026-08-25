@@ -12,7 +12,7 @@ On the RTX 5060 host, install the upstream runtime in its documented Python 3.10
 git clone https://github.com/QwenAudio/CosyVoice.git
 cd CosyVoice
 # create the documented Python 3.10 environment and install the upstream requirements
-python runtime/python/fastapi/server.py --port 50000 --model_dir pretrained_models/Fun-CosyVoice3-0.5B
+python runtime/python/fastapi/server.py --port 2225 --model_dir pretrained_models/Fun-CosyVoice3-0.5B
 ```
 
 The `--model_dir` may be a local model directory or the upstream ModelScope/Hugging Face identifier. Follow the current upstream README for model download and CUDA/TensorRT options. In a second shell, from this folder:
@@ -22,8 +22,8 @@ cd WebService/StoryTTS/CosyVoice
 docker compose build
 docker compose up -d
 python -m pip install -r requirements.txt
-python sample.py --base-url http://127.0.0.1:8002/v1
-python bench.py --base-url http://127.0.0.1:8002/v1 --concurrency 2 --server-slots 1 --requests 16
+python sample.py --base-url http://127.0.0.1:2224/v1
+python bench.py --base-url http://127.0.0.1:2224/v1 --concurrency 2 --server-slots 1 --requests 16
 ```
 
 Copy the consented reference clip to `voices/narrator.wav` before starting the gateway. `COSYVOICE_SAMPLE_RATE=24000` matches the current Fun-CosyVoice3 configuration; confirm the value printed/returned by the upstream runtime and change the environment variable if your build uses another rate.

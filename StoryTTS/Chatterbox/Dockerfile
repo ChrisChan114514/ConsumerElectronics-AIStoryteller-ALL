@@ -6,5 +6,5 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY server.py story.txt ./
 COPY voices ./voices
-EXPOSE 8000
-CMD ["python", "-m", "uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
+EXPOSE 2223
+CMD ["python", "-m", "uvicorn", "server:app", "--host", "0.0.0.0", "--port", "2223"]

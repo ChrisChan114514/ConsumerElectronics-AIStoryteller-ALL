@@ -2,7 +2,7 @@ services:
   chatterbox:
     build: .
     ports:
-      - "8001:8000"
+      - "2223:2223"
     gpus: all
     environment:
       CHATTERBOX_DEVICE: cuda

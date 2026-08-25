@@ -11,12 +11,12 @@ Run this file's commands on the RTX 5060 machine. Do not run them in the develop
 
 ## Samples
 
-| Candidate | Service | Remote command | Output |
-|---|---|---|---|
-| Kokoro | `8880` | `python Kokoro/sample.py --base-url http://127.0.0.1:8880/v1` | `Kokoro/samples/kokoro_story.wav` |
-| Kitten | `8000` | `python Kitten/sample.py --base-url http://127.0.0.1:8000/v1` | `Kitten/samples/kitten_story.wav` |
-| Chatterbox | `8001` | `python Chatterbox/sample.py --base-url http://127.0.0.1:8001/v1` | `Chatterbox/samples/chatterbox_story.wav` |
-| CosyVoice | `8002` | `python CosyVoice/sample.py --base-url http://127.0.0.1:8002/v1` | `CosyVoice/samples/cosyvoice_story.wav` |
+| Candidate  | Service  | Remote command                                                      | Output                                      |
+| ---------- | -------- | ------------------------------------------------------------------- | ------------------------------------------- |
+| Kokoro     | `2221` | `python Kokoro/sample.py --base-url http://127.0.0.1:2221/v1`     | `Kokoro/samples/kokoro_story.wav`         |
+| Kitten     | `2222` | `python Kitten/sample.py --base-url http://127.0.0.1:2222/v1`     | `Kitten/samples/kitten_story.wav`         |
+| Chatterbox | `2223` | `python Chatterbox/sample.py --base-url http://127.0.0.1:2223/v1` | `Chatterbox/samples/chatterbox_story.wav` |
+| CosyVoice  | `2224` | `python CosyVoice/sample.py --base-url http://127.0.0.1:2224/v1`  | `CosyVoice/samples/cosyvoice_story.wav`   |
 
 Listen for pronunciation, pauses, sibilance, emotional range, voice consistency and unwanted artifacts. The script output is WAV so files can be compared without an encoder changing the result.
 

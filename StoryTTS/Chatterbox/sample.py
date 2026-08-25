@@ -9,7 +9,7 @@ import httpx
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base-url", default="http://127.0.0.1:8001/v1")
+    parser.add_argument("--base-url", default="http://127.0.0.1:2223/v1")
     parser.add_argument("--output", default="samples/chatterbox_story.wav")
     args = parser.parse_args()
     text = Path(__file__).with_name("story.txt").read_text(encoding="utf-8")

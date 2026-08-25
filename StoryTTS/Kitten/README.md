@@ -11,8 +11,8 @@ cd WebService/StoryTTS/Kitten
 docker compose build
 docker compose up -d
 python -m pip install -r requirements.txt
-python sample.py --base-url http://127.0.0.1:8000/v1
-python bench.py --base-url http://127.0.0.1:8000/v1 --concurrency 4 --requests 32
+python sample.py --base-url http://127.0.0.1:2222/v1
+python bench.py --base-url http://127.0.0.1:2222/v1 --concurrency 4 --requests 32
 ```
 
 The server serializes only up to `MAX_CONCURRENCY` GPU jobs (default 2), so the benchmark can include queued HTTP requests without causing an uncontrolled VRAM spike. Test 1, 2, 4 and 8 client concurrency levels and select the highest stable setting.
