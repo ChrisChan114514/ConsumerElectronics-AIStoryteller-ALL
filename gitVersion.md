@@ -90,9 +90,12 @@ D:\Game2\ConsumerElectronics\wxDemo_StoryMachinePlan\Plan\初步计划.md 根据
 
 你在这个WebService\StoryTTS 文件夹里面，设计多个Nvida RTX5060 的部署方案，每一个就是一个子文件夹，比如WebService\StoryTTS\Kokoro，进行一个多并发的测试（不在本机，就是python代码和requirement写好，如果py不够快或者不合适，可以用其他语言，我都去搞定）,并生成测试音频（讲一段固定的故事，我听听比较质量），最终我来选择到底使用哪个模型；在本机不做测
 
-
 ### 0.03.4
 
 现在本地的kokoro-82M（RTX5060）服务，达到了78.03的比率，可以用于语音推理，现在完全放弃了doubaoTTS，而是使用kokoro进行实验；所有语音，在当前版本，都使用kokoro_TensorRT_FP16推理方式进行
 
 正在训练一个学生模型，就是更加适用于故事机的较低音质需要
+
+### 0.03.5
+
+很好，现在联合修改Webservice/IoT网络服务层，以及在ESP32\ESP32-S3\IoT\WithEdgeTTS 建立有EdgeTTS的请求；在IoT网络服务代码中，就是检查代码，是否允许解耦输出，就是先请求LLM，再请求对应的语音，注意是对应的语音（这个想服务器请求语音，是可能会请求可能不会请求，因为有可能EdgeTTS网络转台很好，就直接请求EdgeTTS了）；那么这个ESP32代码的流程是这样，先上电开机、测试I2S及测试音；然后测试EdgeTTS的网络情况，如果EdgeTTS可以服务，I2S音响讲Microsoft Edge TTS OK！（请求EdgeTTS讲这个）如果评估不可以，就说发出三个0.25s的2khz声音，然后，如果是EdgeTTS可以的情况，那么就只请求LLM而没有120.26.111.75的语音，语音从edgeTTS请求；如果edgeTTS不可以，那就像现在这样ESP32\ESP32-S3\IoT\NoEdgeTTS 正常进行全盘120.26.111.75的请求

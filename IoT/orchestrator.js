@@ -23,7 +23,10 @@ function normalizeRequest(payload) {
     },
     // This IoT product is English-only. Do not let a device select another story language.
     language: 'en-US',
-    length: ['short', 'medium', 'long'].includes(payload.length) ? payload.length : 'short'
+    length: ['short', 'medium', 'long'].includes(payload.length) ? payload.length : 'short',
+    // Edge-capable devices request the story text only and synthesize audio
+    // themselves. Legacy devices omit this field and keep the server TTS path.
+    synthesize_audio: payload.synthesize_audio !== false
   };
 }
 
@@ -91,6 +94,19 @@ export class StoryOrchestrator {
 
     try {
       const story = await this.storyClient.generateStory(request, deviceId);
+      if (!request.synthesize_audio) {
+        const textReady = {
+          type: 'story.text_ready',
+          request_id: request.request_id,
+          story_id: story.story_id,
+          language: 'en-US',
+          story_text: story.text,
+          message: 'Story text is ready; device-side speech synthesis may start.'
+        };
+        this.jobs.set(key, { state: 'text_ready', event: textReady });
+        await publish(textReady);
+        return;
+      }
       const synthesizing = {
         type: 'story.synthesizing',
         request_id: request.request_id,

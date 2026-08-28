@@ -44,6 +44,11 @@ Stories, single-card teacher WAV audio, PC test-client/device-client records, an
 - `POST /api/stories/generate`: generate or select a story pool entry. Returns `cache_status` and `story_id`.
 - `POST /api/speech/synthesize`: synthesize up to 10,000 characters, or reuse the `story_id` WAV, and return `audio/wav`.
 
+IoT story requests may set `synthesize_audio: false` when a device has its own
+EdgeTTS path. The MQTT service then publishes `story.text_ready` with the
+generated `story_text` and does not call the configured server-side TTS. The
+default (`true` or omitted) keeps the complete LLM + server TTS flow.
+
 The database retention rule is enforced by the application: only single-card stories get a
 `story_audio` row containing the original Kokoro WAV. Multi-card stories keep text and playback
 history only. To remove multi-card audio created before this rule was installed, run
