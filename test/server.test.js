@@ -43,9 +43,9 @@ test('serves health, product config, and the complete card catalog', async () =>
     assert.equal(health.database_ready, false);
     assert.equal(config.default_language, 'en-US');
     assert.equal(typeof config.tts_configured, 'boolean');
-    assert.equal(config.tts_provider, 'doubao');
-    assert.equal(config.tts_model, 'seed-tts-2.0');
-    assert.equal(config.tts_voice, 'zh_female_vv_uranus_bigtts');
+    assert.equal(config.tts_provider, 'kokoro');
+    assert.equal(config.tts_model, 'kokoro-split-hybrid-trt-cuda');
+    assert.equal(config.tts_voice, 'af_heart');
     assert.equal(config.maximum_cards, 4);
     assert.deepEqual(config.story_pool_limits, { single_card: 200, multi_card: 100 });
     assert.deepEqual(config.supported_languages, ['en-US', 'zh-CN']);
@@ -127,7 +127,7 @@ test('serves database inventory and stored audio to the second console view', as
       };
     }
   };
-  const server = createServer({ storyDatabase });
+  const server = createServer({ storyDatabase, iotStatusPath: path.join(os.tmpdir(), `story-status-missing-${process.pid}-${Date.now()}.json`) });
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', resolve);

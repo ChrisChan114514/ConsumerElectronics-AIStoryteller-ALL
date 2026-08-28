@@ -73,3 +73,18 @@ test('uses portable parameterized JSON inserts for MySQL and MariaDB', async () 
   assert.equal(inserts.length, 2);
   assert.equal(inserts.every((statement) => !statement.includes('CAST(? AS JSON)')), true);
 });
+
+test('detects single-card stories for audio retention policy', async () => {
+  const statements = [];
+  const database = new StoryDatabase({ enabled: true, database: 'story_machine' }, {
+    pool: {
+      async query() { return [[]]; },
+      async execute(statement) {
+        statements.push(statement);
+        return [[{ card_count: 1 }]];
+      }
+    }
+  });
+  assert.equal(await database.isSingleCardStory('story-1'), true);
+  assert.match(statements[0], /JSON_LENGTH\(card_ids\)/);
+});

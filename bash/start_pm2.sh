@@ -4,9 +4,11 @@ set -Eeuo pipefail
 
 readonly WEB_APP_NAME="ai-storyteller-webservice"
 readonly IOT_APP_NAME="ai-storyteller-iot"
+readonly TTS_APP_NAME="ai-storyteller-kokoro"
 readonly APP_DIR="/home/cc/Desktop/AIStoryteller/WebService"
 readonly WEB_APP_ENTRY="${APP_DIR}/src/main.js"
 readonly IOT_APP_ENTRY="${APP_DIR}/IoT/main.js"
+readonly TTS_APP_ENTRY="${APP_DIR}/StoryTTS/kokoro_TensorRT_FP16/run_server.sh"
 readonly SERVICE_USER="cc"
 readonly SERVICE_HOME="/home/cc"
 readonly SERVICE_PORT="2210"
@@ -69,10 +71,12 @@ iot_health_check() {
 }
 
 show_failure_diagnostics() {
+  pm2 describe "${TTS_APP_NAME}" || true
   pm2 describe "${WEB_APP_NAME}" || true
   pm2 describe "${IOT_APP_NAME}" || true
   pm2 logs "${WEB_APP_NAME}" --lines 80 --nostream || true
   pm2 logs "${IOT_APP_NAME}" --lines 80 --nostream || true
+  pm2 logs "${TTS_APP_NAME}" --lines 80 --nostream || true
   if command_exists ss; then
     log "TCP listeners related to ports ${SERVICE_PORT} and ${IOT_PORT}:"
     ss -ltnp 2>/dev/null | grep -E "(^|:)(${SERVICE_PORT}|${IOT_PORT})([[:space:]]|$)" || true
@@ -116,12 +120,20 @@ else
   fail "No API key found. Add it to APIkey/DeepseekAPI.txt or export LLM_API_KEY."
 fi
 
-if [[ -n "${TTS_API_KEY:-}" ]]; then
-  log "Using TTS_API_KEY from the current environment."
-elif grep -Eq '^[A-Za-z0-9_-]{20,}$' "${APP_DIR}/APIkey/Doubao_TTS.txt" 2>/dev/null; then
-  chmod 600 "${APP_DIR}/APIkey/Doubao_TTS.txt"
+tts_provider="$(sed -nE 's/^[[:space:]]*TTS_PROVIDER[[:space:]]*=(.*)$/\1/p' "${APP_DIR}/.env" | tail -n 1 | tr -d '\r' | tr '[:upper:]' '[:lower:]')"
+tts_provider="${tts_provider:-kokoro}"
+if [[ "${tts_provider}" == "doubao" ]]; then
+  if [[ -n "${TTS_API_KEY:-}" ]]; then
+    log "Using TTS_API_KEY from the current environment."
+  elif grep -Eq '^[A-Za-z0-9_-]{20,}$' "${APP_DIR}/APIkey/Doubao_TTS.txt" 2>/dev/null; then
+    chmod 600 "${APP_DIR}/APIkey/Doubao_TTS.txt"
+  else
+    fail "No Doubao TTS key found. Add it to APIkey/Doubao_TTS.txt or export TTS_API_KEY."
+  fi
 else
-  fail "No Doubao TTS key found. Add it to APIkey/Doubao_TTS.txt or export TTS_API_KEY."
+  kokoro_endpoint="$(sed -nE 's/^[[:space:]]*TTS_BASE_URL[[:space:]]*=(.*)$/\1/p' "${APP_DIR}/.env" | tail -n 1 | tr -d '\r')"
+  kokoro_endpoint="${kokoro_endpoint:-http://127.0.0.1:2229}"
+  log "Using local ${tts_provider} TTS endpoint: ${kokoro_endpoint}"
 fi
 
 cd "${APP_DIR}"
@@ -156,12 +168,33 @@ export IOT_PUBLIC_AUDIO_BASE_URL="${IOT_PUBLIC_AUDIO_BASE_URL:-http://120.26.111
 node_bin="$(command -v node)"
 pm2_bin="$(command -v pm2)"
 
-for app_name in "${WEB_APP_NAME}" "${IOT_APP_NAME}"; do
+for app_name in "${WEB_APP_NAME}" "${IOT_APP_NAME}" "${TTS_APP_NAME}"; do
   if pm2 describe "${app_name}" >/dev/null 2>&1; then
     log "Removing the previous PM2 definition: ${app_name}"
     pm2 delete "${app_name}"
   fi
 done
+
+if [[ "${tts_provider}" == "kokoro" ]]; then
+  [[ -x "${TTS_APP_ENTRY}" ]] || fail "Kokoro startup script is missing or not executable: ${TTS_APP_ENTRY}"
+  log "Starting Kokoro TensorRT FP16 teacher service on port 2229..."
+  PORT=2229 KOKORO_ENABLE_TEACHER_LABELS=0 pm2 start "${TTS_APP_ENTRY}" \
+    --name "${TTS_APP_NAME}" \
+    --cwd "$(dirname "${TTS_APP_ENTRY}")" \
+    --interpreter bash \
+    --time \
+    --max-memory-restart 8G
+  log "Waiting for Kokoro health check on port 2229..."
+  kokoro_ready=false
+  for _attempt in {1..60}; do
+    if node -e 'fetch("http://127.0.0.1:2229/health", {signal: AbortSignal.timeout(2000)}).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))'; then
+      kokoro_ready=true
+      break
+    fi
+    sleep 1
+  done
+  [[ "${kokoro_ready}" == "true" ]] || { show_failure_diagnostics; fail "Kokoro did not pass its health check on port 2229."; }
+fi
 
 log "Starting WebService on HTTP port ${SERVICE_PORT}..."
 pm2 start "${WEB_APP_ENTRY}" \

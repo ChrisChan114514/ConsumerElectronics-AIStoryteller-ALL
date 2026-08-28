@@ -206,8 +206,9 @@ export class StoryDatabase {
   async getAudio(storyId) {
     await this.initialize();
     const [rows] = await this.pool.execute(
-      `SELECT provider, model, voice, audio_format, sample_rate, audio_bytes, byte_length
-       FROM story_audio WHERE story_id = ?`,
+      `SELECT a.provider, a.model, a.voice, a.audio_format, a.sample_rate, a.audio_bytes, a.byte_length
+       FROM story_audio a JOIN stories s ON s.story_id = a.story_id
+       WHERE a.story_id = ? AND JSON_LENGTH(s.card_ids) = 1`,
       [storyId]
     );
     if (!rows[0]) return null;
@@ -232,7 +233,7 @@ export class StoryDatabase {
           COALESCE(h.listeners, 0) AS listeners, COALESCE(h.plays, 0) AS plays,
           h.last_played_at
        FROM stories s
-       LEFT JOIN story_audio a ON a.story_id = s.story_id
+       LEFT JOIN story_audio a ON a.story_id = s.story_id AND JSON_LENGTH(s.card_ids) = 1
        LEFT JOIN (
          SELECT story_id, COUNT(*) AS listeners, SUM(play_count) AS plays, MAX(last_played_at) AS last_played_at
          FROM story_history GROUP BY story_id
@@ -279,6 +280,15 @@ export class StoryDatabase {
     );
   }
 
+  async isSingleCardStory(storyId) {
+    await this.initialize();
+    const [rows] = await this.pool.execute(
+      'SELECT JSON_LENGTH(card_ids) AS card_count FROM stories WHERE story_id = ?',
+      [storyId]
+    );
+    return Number(rows[0]?.card_count || 0) === 1;
+  }
+
   async recordPlayback(client, storyId) {
     await this.ensureClient(client);
     await this.pool.execute(
@@ -309,7 +319,7 @@ export class StoryDatabase {
           COALESCE(h.listeners, 0) AS listeners, COALESCE(h.plays, 0) AS plays,
           h.last_played_at
         FROM stories s
-        LEFT JOIN story_audio a ON a.story_id = s.story_id
+        LEFT JOIN story_audio a ON a.story_id = s.story_id AND JSON_LENGTH(s.card_ids) = 1
         LEFT JOIN (
           SELECT story_id, COUNT(*) AS listeners, SUM(play_count) AS plays, MAX(last_played_at) AS last_played_at
           FROM story_history GROUP BY story_id

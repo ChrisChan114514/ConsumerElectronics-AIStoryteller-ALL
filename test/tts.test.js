@@ -72,3 +72,25 @@ test('rejects synthesis when Doubao TTS is not configured', async () => {
     (error) => error instanceof TtsError && error.code === 'TTS_NOT_CONFIGURED'
   );
 });
+
+test('calls the local Kokoro OpenAI-compatible endpoint and returns WAV', async () => {
+  let captured;
+  const result = await synthesizeSpeech({
+    config: {
+      provider: 'kokoro', endpoint: 'http://127.0.0.1:2229', resourceId: 'kokoro-split-hybrid-trt-cuda',
+      voice: 'af_heart', timeoutMs: 2_000
+    },
+    request: { text: 'A tiny story.', rate: 0.9 },
+    fetchImpl: async (url, options) => {
+      captured = { url, body: JSON.parse(options.body) };
+      return new Response(Buffer.from('RIFF-kokoro'), { status: 200, headers: { 'content-type': 'audio/wav' } });
+    }
+  });
+  assert.equal(captured.url, 'http://127.0.0.1:2229/v1/audio/speech');
+  assert.deepEqual(captured.body, {
+    model: 'kokoro', voice: 'af_heart', input: 'A tiny story.', response_format: 'wav', speed: 0.9
+  });
+  assert.equal(result.format, 'wav');
+  assert.equal(result.contentType, 'audio/wav');
+  assert.equal(result.model, 'kokoro-split-hybrid-trt-cuda');
+});

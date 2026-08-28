@@ -17,9 +17,47 @@ node_modules/
 IoT/generated-audio/
 IoT/runtime-status.json
 IoT/runtime-status.json.*.tmp
+StoryTTS/backup/
 coverage/
 *.log
 .DS_Store
 __MACOSX/
 ._*
 Thumbs.db
+
+# Python runtime artifacts
+__pycache__/
+*.py[cod]
+
+# Local databases and exported backups
+*.sqlite
+*.sqlite3
+*.db
+*.sql.gz
+*.bak
+*.backup
+
+# Downloaded and generated TTS model artifacts
+*.onnx
+*.onnx_data
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.nemo
+*.engine
+*.plan
+*.trt
+*.timing
+
+# TTS runtime caches, downloaded models, and generated training corpora
+StoryTTS/kokoro_TensorRT_FP16/checkpoints/
+StoryTTS/kokoro_TensorRT_FP16/models/
+StoryTTS/kokoro_TensorRT_FP16/trt_cache/
+StoryTTS/kokoro_TensorRT_FP16/voices/
+StoryTTS/kokoro_TensorRT_FP16/samples/
+StoryTTS/Kokoro-Lite-English/checkpoints/
+StoryTTS/Kokoro-Lite-English/models/
+StoryTTS/Kokoro-Lite-English/teacher_data/
+StoryTTS/Kokoro-Lite-English/teacher_data_iot/
+StoryTTS/kokoro_TensorRT_FP16/upstream/kokoro-onnx

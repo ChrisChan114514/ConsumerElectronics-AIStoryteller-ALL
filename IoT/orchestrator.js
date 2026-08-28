@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { saveGeneratedAudio } from './audioStore.js';
+import { transcodeWavToMp3 } from './audioTranscode.js';
 
 const requestIdPattern = /^[A-Za-z0-9_-]{1,80}$/;
 const cardIdPattern = /^C\d{3}$/;
@@ -26,14 +27,37 @@ function normalizeRequest(payload) {
   };
 }
 
+function detectAudioFormat(audio) {
+  return Buffer.isBuffer(audio) && audio.length >= 12 && audio.subarray(0, 4).toString('ascii') === 'RIFF'
+    ? 'wav'
+    : 'mp3';
+}
+
+async function synthesizeWithRetry(storyClient, story, deviceId) {
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await storyClient.synthesizeSpeech(story, deviceId);
+    } catch (error) {
+      lastError = error;
+      const retryable = ['WEB_SERVICE_UNREACHABLE', 'TTS_CONNECTION_FAILED', 'TTS_TIMEOUT'].includes(error.code);
+      if (!retryable || attempt === 2) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
+
 export class StoryOrchestrator {
-  constructor({ storyClient, audioDirectory, publicAudioBaseUrl, idFactory = () => crypto.randomUUID() }) {
+  constructor({ storyClient, audioDirectory, publicAudioBaseUrl,
+    idFactory = () => crypto.randomUUID(), transcodeAudio = transcodeWavToMp3 }) {
     this.storyClient = storyClient;
     this.audioDirectory = audioDirectory;
     this.publicAudioBaseUrl = publicAudioBaseUrl.replace(/\/+$/, '');
     const publicUrl = new URL(this.publicAudioBaseUrl);
     this.audioPort = Number(publicUrl.port) || (publicUrl.protocol === 'https:' ? 443 : 80);
     this.idFactory = idFactory;
+    this.transcodeAudio = transcodeAudio;
     this.jobs = new Map();
   }
 
@@ -76,17 +100,24 @@ export class StoryOrchestrator {
       this.jobs.set(key, { state: 'synthesizing', event: synthesizing });
       await publish(synthesizing);
 
-      const audio = await this.storyClient.synthesizeSpeech(story, deviceId);
+      const sourceAudio = await synthesizeWithRetry(this.storyClient, story, deviceId);
+      // WebService keeps the original teacher WAV in MySQL. IoT serves an MP3
+      // derivative because the current ESP32 firmware uses AudioGeneratorMP3.
+      const audio = await this.transcodeAudio(sourceAudio);
       const audioId = this.idFactory();
+      const audioFormat = 'mp3';
       await saveGeneratedAudio(audioId, audio, {
         request_id: request.request_id,
         story_id: story.story_id,
         device_id: deviceId,
         card_ids: request.card_ids,
-        language: 'en-US'
+        language: 'en-US',
+        audio_format: audioFormat,
+        source_audio_format: detectAudioFormat(sourceAudio),
+        content_type: audioFormat === 'wav' ? 'audio/wav' : 'audio/mpeg'
       }, this.audioDirectory);
 
-      const audioPath = `/api/iot/audio/${audioId}.mp3`;
+      const audioPath = `/api/iot/audio/${audioId}.${audioFormat}`;
       const ready = {
         type: 'story.ready',
         request_id: request.request_id,

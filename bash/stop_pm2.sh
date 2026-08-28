@@ -2,7 +2,7 @@
 
 set -Eeuo pipefail
 
-readonly APP_NAMES=("ai-storyteller-webservice" "ai-storyteller-iot")
+readonly APP_NAMES=("ai-storyteller-webservice" "ai-storyteller-iot" "ai-storyteller-kokoro")
 readonly SERVICE_USER="cc"
 
 log() {
@@ -30,6 +30,5 @@ done
 # Persist the removal so pm2 resurrect will not restart this application.
 pm2 save --force
 
-log "WebService and IoT service are stopped and removed from the saved PM2 process list."
+log "WebService, IoT, and Kokoro services are stopped and removed from the saved PM2 process list."
 log "The shared PM2 systemd service remains enabled for other PM2 applications."
-

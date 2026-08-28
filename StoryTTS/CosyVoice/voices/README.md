@@ -1,1 +1,0 @@
-Place a consented 6-10 second English narrator WAV at `voices/narrator.wav` on the remote GPU host. The gateway sends this file to the official CosyVoice runtime for cross-lingual zero-shot English synthesis. This workspace intentionally contains no audio file.

@@ -74,6 +74,28 @@ async function databaseStatus(storyDatabase) {
   }
 }
 
+async function ttsStatus() {
+  if (config.tts.provider !== 'kokoro') {
+    return { configured: Boolean(config.tts.apiKey && config.tts.endpoint), ready: null };
+  }
+  try {
+    const response = await fetch(`${config.tts.endpoint.replace(/\/+$/, '')}/health`, {
+      signal: AbortSignal.timeout(2000)
+    });
+    if (!response.ok) return { configured: true, ready: false, status: response.status };
+    const body = await response.json().catch(() => ({}));
+    return {
+      configured: true,
+      ready: body.status === 'ok',
+      model: body.model || config.tts.resourceId,
+      precision: body.precision || null,
+      providers: body.providers || null
+    };
+  } catch (error) {
+    return { configured: true, ready: false, error: error.code || error.message };
+  }
+}
+
 async function readJson(request) {
   let size = 0;
   const chunks = [];
@@ -132,10 +154,11 @@ async function findGeneratedAudio(storyId) {
 
   const matches = [];
   for (const entry of entries) {
-    if (!entry.isFile() || !entry.name.endsWith('.mp3.json')) continue;
+    if (!entry.isFile() || !/\.mp3\.json$/i.test(entry.name)) continue;
     try {
       const metadata = JSON.parse(await fs.readFile(path.join(iotConfig.audioDirectory, entry.name), 'utf8'));
       if (metadata.story_id !== storyId) continue;
+      const format = 'mp3';
       const audioId = entry.name.slice(0, -'.mp3.json'.length);
       matches.push({
         audio_id: audioId,
@@ -145,6 +168,7 @@ async function findGeneratedAudio(storyId) {
         language: metadata.language || 'en-US',
         bytes: Number(metadata.bytes || 0),
         created_at: metadata.created_at || null,
+        format,
         endpoint: `/api/iot/audio/${audioId}.mp3`
       });
     } catch {
@@ -173,9 +197,9 @@ async function buildStoryDelivery(story, iotStatusPath) {
 }
 
 async function handleApi(request, response, pathname, requestId, storyDatabase, iotStatusPath) {
-  const iotAudioMatch = pathname.match(/^\/api\/iot\/audio\/([A-Za-z0-9_-]{1,80})\.mp3$/);
+  const iotAudioMatch = pathname.match(/^\/api\/iot\/audio\/([A-Za-z0-9_-]{1,80})\.mp3$/i);
   if (['GET', 'HEAD'].includes(request.method) && iotAudioMatch) {
-    await serveGeneratedAudio(request, response, iotAudioMatch[1]);
+    await serveGeneratedAudio(request, response, iotAudioMatch[1], iotConfig.audioDirectory, 'mp3');
     return true;
   }
 
@@ -186,11 +210,14 @@ async function handleApi(request, response, pathname, requestId, storyDatabase, 
 
   if (request.method === 'GET' && pathname === '/api/health') {
     const database = await databaseStatus(storyDatabase);
+    const tts = await ttsStatus();
     sendJson(response, 200, {
       status: 'ok',
       service: 'story-machine-web-service',
       llm_configured: Boolean(config.llm.apiKey),
-      tts_configured: Boolean(config.tts.apiKey && config.tts.endpoint),
+      tts_configured: tts.configured,
+      tts_ready: tts.ready,
+      tts_model: tts.model || config.tts.resourceId,
       database_configured: database.configured,
       database_ready: database.ready,
       timestamp: new Date().toISOString()
@@ -199,11 +226,13 @@ async function handleApi(request, response, pathname, requestId, storyDatabase, 
   }
 
   if (request.method === 'GET' && pathname === '/api/config') {
+    const tts = await ttsStatus();
     sendJson(response, 200, {
       model: config.llm.model,
       base_url: config.llm.baseUrl,
       llm_configured: Boolean(config.llm.apiKey),
-      tts_configured: Boolean(config.tts.apiKey && config.tts.endpoint),
+      tts_configured: tts.configured,
+      tts_ready: tts.ready,
       tts_provider: config.tts.provider,
       tts_model: config.tts.resourceId,
       tts_voice: config.tts.voice,
@@ -269,7 +298,7 @@ async function handleApi(request, response, pathname, requestId, storyDatabase, 
         provider: 'iot-generated',
         model: null,
         voice: null,
-        format: 'mp3',
+        format: delivery.generated_audio.format || 'mp3',
         sample_rate: null,
         bytes: delivery.generated_audio.bytes,
         created_at: delivery.generated_audio.created_at,
@@ -407,7 +436,9 @@ async function handleApi(request, response, pathname, requestId, storyDatabase, 
     }
     if (!speech) {
       speech = await synthesizeSpeech({ config: config.tts, request: body });
-      if (storyDatabase.configured && body.story_id) {
+      const shouldPersistAudio = storyDatabase.configured && body.story_id &&
+        (!storyDatabase.isSingleCardStory || await storyDatabase.isSingleCardStory(body.story_id));
+      if (shouldPersistAudio) {
         try {
           await storyDatabase.saveAudio(body.story_id, speech, config.tts);
         } catch (error) {
@@ -459,7 +490,7 @@ export function createServer({ storyDatabase = new StoryDatabase(config.database
     } catch (error) {
       const knownError = error instanceof ValidationError || error instanceof LlmError || error instanceof TtsError || error instanceof StoryDatabaseError;
       const status = error.status || (error instanceof ValidationError ? 400 : 500);
-      console.error(JSON.stringify({ event: 'request.failed', requestId, code: error.code, message: error.message }));
+      console.error(JSON.stringify({ event: 'request.failed', requestId, code: error.code, message: error.message, details: error.details }));
       sendJson(response, status, {
         error: {
           code: error.code || (knownError ? 'INVALID_REQUEST' : 'INTERNAL_ERROR'),

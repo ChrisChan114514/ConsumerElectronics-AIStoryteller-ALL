@@ -1,0 +1,14 @@
+# Installed by setup_pytorch_env.sh in a controlled order.
+onnxruntime-gpu[cuda,cudnn]==1.23.2
+kokoro-onnx==0.6.1
+tensorrt-cu12==10.11.0.33
+soundfile==0.14.0
+fastapi>=0.115,<1
+uvicorn[standard]>=0.34,<1
+httpx>=0.28,<1
+phonemizer>=3.4.0
+espeakng-loader>=0.2.4
+onnx==1.17.0
+transformers==4.48.3
+scipy==1.13.1
+loguru==0.7.3

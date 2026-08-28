@@ -4,6 +4,7 @@ import path from 'node:path';
 import { iotConfig } from './config.js';
 
 const audioIdPattern = /^[A-Za-z0-9_-]{1,80}$/;
+const audioFormatPattern = /^(mp3|wav)$/i;
 
 function assertAudioId(audioId) {
   if (!audioIdPattern.test(audioId)) throw new Error('Invalid IoT audio ID.');
@@ -31,9 +32,10 @@ export function parseByteRange(header, size) {
   return { start, end: Math.min(end, size - 1) };
 }
 
-export function generatedAudioPath(audioId, directory = iotConfig.audioDirectory) {
+export function generatedAudioPath(audioId, directory = iotConfig.audioDirectory, format = 'mp3') {
   assertAudioId(audioId);
-  return path.join(directory, `${audioId}.mp3`);
+  if (!audioFormatPattern.test(format)) throw new Error('Invalid IoT audio format.');
+  return path.join(directory, `${audioId}.${format.toLowerCase()}`);
 }
 
 export async function saveGeneratedAudio(audioId, audio, metadata = {}, directory = iotConfig.audioDirectory) {
@@ -41,7 +43,8 @@ export async function saveGeneratedAudio(audioId, audio, metadata = {}, director
   if (!Buffer.isBuffer(audio) || audio.length === 0) throw new Error('Generated audio is empty.');
   await fs.mkdir(directory, { recursive: true });
 
-  const filename = generatedAudioPath(audioId, directory);
+  const format = String(metadata.audio_format || metadata.format || 'mp3').toLowerCase();
+  const filename = generatedAudioPath(audioId, directory, format);
   const temporary = `${filename}.${process.pid}.tmp`;
   await fs.writeFile(temporary, audio);
   await fs.rename(temporary, filename);
@@ -54,14 +57,14 @@ export async function saveGeneratedAudio(audioId, audio, metadata = {}, director
   return { filename, bytes: audio.length };
 }
 
-export async function serveGeneratedAudio(request, response, audioId, directory = iotConfig.audioDirectory) {
+export async function serveGeneratedAudio(request, response, audioId, directory = iotConfig.audioDirectory, format = 'mp3') {
   let filename;
   let stat;
   try {
-    filename = generatedAudioPath(audioId, directory);
+    filename = generatedAudioPath(audioId, directory, format);
     stat = await fs.stat(filename);
   } catch (error) {
-    if (error.code === 'ENOENT' || error.message === 'Invalid IoT audio ID.') {
+    if (error.code === 'ENOENT' || error.message.startsWith('Invalid IoT audio')) {
       const body = JSON.stringify({ error: { code: 'AUDIO_NOT_FOUND', message: 'Generated audio was not found.' } });
       response.writeHead(404, {
         'Content-Type': 'application/json; charset=utf-8',
@@ -86,7 +89,7 @@ export async function serveGeneratedAudio(request, response, audioId, directory 
     'Accept-Ranges': 'bytes',
     'Cache-Control': 'private, max-age=3600',
     'Content-Length': range.end - range.start + 1,
-    'Content-Type': 'audio/mpeg'
+    'Content-Type': format.toLowerCase() === 'wav' ? 'audio/wav' : 'audio/mpeg'
   };
   if (partial) headers['Content-Range'] = `bytes ${range.start}-${range.end}/${stat.size}`;
   response.writeHead(partial ? 206 : 200, headers);

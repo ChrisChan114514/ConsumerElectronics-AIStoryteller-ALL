@@ -72,6 +72,51 @@ test('authenticates a device and completes the story control flow', async () => 
   }
 });
 
+test('converts teacher WAV to an MP3 playback artifact before publishing ready', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'story-iot-wav-'));
+  const storyClient = {
+    async generateStory() { return { story_id: 'story-wav', text: 'A WAV story.' }; },
+    async synthesizeSpeech() {
+      return Buffer.from('RIFF----WAVEfmt ');
+    }
+  };
+  const service = await createIoTService({
+    host: '127.0.0.1', mqttPort: 0,
+    mqttUsername: 'wav-user', mqttPassword: 'wav-password',
+    publicAudioBaseUrl: 'http://127.0.0.1:2210', audioDirectory: directory,
+    statusPath: path.join(directory, 'runtime-status.json'), storyClient,
+    orchestrator: new (await import('./orchestrator.js')).StoryOrchestrator({
+      storyClient, audioDirectory: directory, publicAudioBaseUrl: 'http://127.0.0.1:2210',
+      transcodeAudio: async (audio) => {
+        assert.equal(audio.subarray(0, 4).toString(), 'RIFF');
+        return Buffer.from('ID3-converted');
+      }
+    })
+  });
+  let client;
+  try {
+    const address = await service.start(0, '127.0.0.1');
+    client = await connect(`mqtt://127.0.0.1:${address.port}`, {
+      clientId: 'SIM-WAV01', username: 'wav-user', password: 'wav-password'
+    });
+    await new Promise((resolve, reject) => client.subscribe(topicFor('SIM-WAV01', 'events'), { qos: 1 },
+      (error) => error ? reject(error) : resolve()));
+    const received = waitForEvents(client, 3);
+    client.publish(topicFor('SIM-WAV01', 'request'), JSON.stringify({
+      request_id: 'req-wav-1', card_ids: ['C001']
+    }), { qos: 1 });
+    const events = await received;
+    assert.equal(events[2].audio_path.endsWith('.mp3'), true);
+    assert.equal(events[2].audio_bytes, 13);
+    const filename = events[2].audio_path.split('/').at(-1);
+    assert.equal((await fs.readFile(path.join(directory, filename))).toString(), 'ID3-converted');
+  } finally {
+    if (client) client.end(true);
+    await service.close();
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
 test('rejects invalid MQTT credentials', async () => {
   const service = await createIoTService({
     host: '127.0.0.1', mqttPort: 0,

@@ -25,30 +25,38 @@ export async function createChatCompletion({ config, messages, options, fetchImp
   const model = config.allowModelOverride && options.model ? options.model : config.model;
   const startedAt = performance.now();
   let response;
-
-  try {
-    response = await fetchImpl(completionUrl(config.baseUrl), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.apiKey}`
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: options.temperature,
-        max_tokens: options.maxTokens,
-        ...(config.thinking ? { thinking: { type: config.thinking } } : {}),
-        stream: false
-      }),
-      signal: AbortSignal.timeout(config.timeoutMs)
-    });
-  } catch (error) {
-    const timedOut = error?.name === 'TimeoutError';
+  let lastError;
+  const attempts = Math.max(1, Number(config.retryAttempts || 2));
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      response = await fetchImpl(completionUrl(config.baseUrl), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.apiKey}`
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: options.temperature,
+          max_tokens: options.maxTokens,
+          ...(config.thinking ? { thinking: { type: config.thinking } } : {}),
+          stream: false
+        }),
+        signal: AbortSignal.timeout(config.timeoutMs)
+      });
+      break;
+    } catch (error) {
+      lastError = error;
+      if (attempt + 1 < attempts) await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+    }
+  }
+  if (!response) {
+    const timedOut = lastError?.name === 'TimeoutError' || lastError?.name === 'AbortError';
     throw new LlmError(timedOut ? 'LLM 请求超时' : '无法连接 LLM 服务', {
       status: timedOut ? 504 : 502,
       code: timedOut ? 'LLM_TIMEOUT' : 'LLM_CONNECTION_FAILED',
-      details: error?.message
+      details: lastError?.message
     });
   }
 

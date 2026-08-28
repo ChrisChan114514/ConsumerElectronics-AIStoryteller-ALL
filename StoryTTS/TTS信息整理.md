@@ -24,3 +24,64 @@ DeepInfra: [deepinfra.com/hexgrad/Kokoro-82M](https://deepinfra.com/hexgrad/Koko
 Together AI：[www.together.ai/models/kokoro-82m](https://www.together.ai/models/kokoro-82m)
 
 Hugging face介绍：[huggingface.co/hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M)
+
+
+| 优先级 | 模型 | GPU/并发路线 | 判断 |
+|---|---|---|---|
+| 1 | Matcha-TTS + HiFiGAN-small | ONNX Runtime CUDA、非自回归、批量推理 | 最值得先实测，英语故事场景合适 |
+| 2 | FastPitch + HiFiGAN | TensorRT/Triton、动态批处理 | 最有希望做成稳定高吞吐生产服务 |
+| 3 | MeloTTS | PyTorch CUDA、VITS | 部署简单、音质要求低时值得作为对照组 |
+| 4 | Supertonic 3 | 批量推理、低采样步数 | 潜在极快，但官方 GPU 路径不够成熟 |
+| 5 | CosyVoice TensorRT | TensorRT-LLM/Triton | 更重，偏向音质和能力，不适合单纯追求最快 |
+| 6 | VibeVoice-Realtime 0.5B | CUDA 流式生成 | 首包快，但完整故事吞吐量未必高 |
+
+docker-pytorch镜项资源：
+FASTPITCH_PYTORCH_IMAGE=docker.m.daocloud.io/pytorch/pytorch \
+docker compose build
+
+极限优化推理kokoro_TensorRT_FP16测试结果
+
+| 执行槽/并发 | 吞吐 | p50 | 结果 |
+|---|---:|---:|---|
+| 1/1 | 0.787 req/s | 1.274s | 8/8 |
+| 4/4 | 1.596 req/s | 2.471s | 32/32 |
+| 4/8 | 1.561 req/s | 5.098s | 32/32 |
+
+
+成功的测试：
+cd /home/cc/Desktop/AIStoryteller/WebService/StoryTTS/kokoro_TensorRT_FP16
+
+/home/cc/miniforge3/envs/pytorch/bin/python bench.py \
+  --base-url http://127.0.0.1:2229/v1 \
+  --concurrency 4 \
+  --requests 32
+
+这个版本的核心思路是“拆开模型，分别用最适合的 GPU 加速方式运行”。
+Kokoro 原始推理大致分两步：
+1. 前端：把文本转换为音素，预测每个音素持续多久、语调和韵律。
+2. 声码器：根据这些特征生成最终 24 kHz 音频波形。
+
+本次加速路径是：
+- 前端使用 TensorRT FP16
+  - FP16 将大量神经网络计算从 FP32 降到半精度。
+  - RTX 5060 的 Tensor Core 对 FP16 矩阵计算很快。
+  - TensorRT 会融合算子、选择更快的 CUDA kernel，并缓存优化后的 engine。
+- 声码器使用 ONNX Runtime CUDA FP32
+  - 声码器包含 InstanceNorm、Snake 激活、随机噪声和 iSTFT 等对精度敏感的算子。
+  - 强制整段 TensorRT FP16 会偶发 NaN，或造成大量子图切分、RAM 暴涨。
+  - 因此保留 CUDA FP32，稳定性和音质更可靠，同时仍在 RTX 5060 上计算，不是 CPU 推理。
+- 并发使用 4 个执行线程，共享一份模型
+  - 不需要启动 4 个容器，也不需要加载 4 份模型。
+  - 同一个 GPU 上可同时提交多条推理任务，让 GPU 持续处于高利用率。
+  - 你的实测 4 并发约 1.6 请求/秒，GPU SM 长时间接近 90% 到 100%，说明显卡已被有效利用。
+
+可以把它理解为：
+
+文本
+  -> TensorRT FP16 前端：快速预测发音、时长、韵律
+  -> CUDA FP32 声码器：稳定生成音频
+  -> WAV 返回
+
+
+
+

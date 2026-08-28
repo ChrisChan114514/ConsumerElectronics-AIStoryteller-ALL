@@ -58,6 +58,9 @@ function eventError(event) {
 }
 
 export async function synthesizeSpeech({ config, request, fetchImpl = fetch }) {
+  if (config.provider === 'kokoro') {
+    return synthesizeKokoroSpeech({ config, request, fetchImpl });
+  }
   if (!config.apiKey || !config.endpoint) {
     throw new TtsError('Doubao TTS is not configured.', 'TTS_NOT_CONFIGURED', 503);
   }
@@ -127,5 +130,65 @@ export async function synthesizeSpeech({ config, request, fetchImpl = fetch }) {
     usage: { characters: normalized.text.length },
     latencyMs: Date.now() - startedAt,
     providerRequestId: response.headers.get('x-tt-logid') || ''
+  };
+}
+
+async function synthesizeKokoroSpeech({ config, request, fetchImpl }) {
+  if (!config.endpoint) {
+    throw new TtsError('Kokoro TTS is not configured.', 'TTS_NOT_CONFIGURED', 503);
+  }
+
+  const normalized = normalizeSpeechRequest(request);
+  const requestId = crypto.randomUUID();
+  const startedAt = Date.now();
+  let response;
+  try {
+    response = await fetchImpl(`${config.endpoint.replace(/\/+$/, '')}/v1/audio/speech`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Request-Id': requestId },
+      body: JSON.stringify({
+        model: 'kokoro',
+        voice: config.voice,
+        input: normalized.text,
+        response_format: 'wav',
+        speed: normalized.rate
+      }),
+      signal: AbortSignal.timeout(config.timeoutMs)
+    });
+  } catch (error) {
+    const timedOut = error.name === 'TimeoutError' || error.name === 'AbortError';
+    throw new TtsError(
+      timedOut ? 'Kokoro TTS request timed out.' : 'Unable to connect to Kokoro TTS.',
+      timedOut ? 'TTS_TIMEOUT' : 'TTS_CONNECTION_FAILED',
+      timedOut ? 504 : 502,
+      error.message
+    );
+  }
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => '');
+    throw new TtsError(
+      message || `Kokoro TTS rejected the request (${response.status}).`,
+      'TTS_REQUEST_REJECTED',
+      502
+    );
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('audio') && !contentType.includes('octet-stream')) {
+    throw new TtsError('Kokoro TTS returned a non-audio response.', 'TTS_INVALID_RESPONSE', 502);
+  }
+  const audio = Buffer.from(await response.arrayBuffer());
+  if (audio.length === 0) throw new TtsError('Kokoro TTS returned no audio data.', 'TTS_EMPTY_AUDIO');
+
+  return {
+    audio,
+    contentType: 'audio/wav',
+    format: 'wav',
+    model: config.resourceId || 'kokoro',
+    taskId: requestId,
+    usage: { characters: normalized.text.length },
+    latencyMs: Date.now() - startedAt,
+    providerRequestId: response.headers.get('x-request-id') || requestId
   };
 }

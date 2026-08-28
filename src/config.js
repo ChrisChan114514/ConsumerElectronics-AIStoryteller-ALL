@@ -82,6 +82,8 @@ function readDoubaoTtsKeyFile() {
   }
 }
 
+const ttsProvider = string('TTS_PROVIDER', 'kokoro').toLowerCase();
+
 function thinkingMode() {
   const value = (process.env.LLM_THINKING || 'disabled').toLowerCase();
   return ['enabled', 'disabled'].includes(value) ? value : 'disabled';
@@ -96,15 +98,18 @@ export const config = Object.freeze({
     apiKey: process.env.LLM_API_KEY || readApiKeyFile(),
     model: process.env.LLM_MODEL || 'deepseek-v4-flash',
     timeoutMs: integer('LLM_TIMEOUT_MS', 90_000, 1_000, 300_000),
+    retryAttempts: integer('LLM_RETRY_ATTEMPTS', 2, 1, 3),
     allowModelOverride: boolean('ALLOW_MODEL_OVERRIDE', true),
     thinking: thinkingMode()
   }),
   tts: Object.freeze({
-    provider: 'doubao',
-    endpoint: process.env.TTS_BASE_URL || 'https://openspeech.bytedance.com/api/v3/tts/unidirectional',
-    apiKey: process.env.TTS_API_KEY || readDoubaoTtsKeyFile(),
-    resourceId: process.env.TTS_RESOURCE_ID || 'seed-tts-2.0',
-    voice: process.env.TTS_VOICE || 'zh_female_vv_uranus_bigtts',
+    provider: ttsProvider,
+    endpoint: process.env.TTS_BASE_URL || (ttsProvider === 'doubao'
+      ? 'https://openspeech.bytedance.com/api/v3/tts/unidirectional'
+      : 'http://127.0.0.1:2229'),
+    apiKey: process.env.TTS_API_KEY || (ttsProvider === 'doubao' ? readDoubaoTtsKeyFile() : ''),
+    resourceId: process.env.TTS_RESOURCE_ID || (ttsProvider === 'doubao' ? 'seed-tts-2.0' : 'kokoro-split-hybrid-trt-cuda'),
+    voice: process.env.TTS_VOICE || (ttsProvider === 'doubao' ? 'zh_female_vv_uranus_bigtts' : 'af_heart'),
     timeoutMs: integer('TTS_TIMEOUT_MS', 120_000, 5_000, 300_000),
     sampleRate: integer('TTS_SAMPLE_RATE', 24_000, 8_000, 48_000)
   }),

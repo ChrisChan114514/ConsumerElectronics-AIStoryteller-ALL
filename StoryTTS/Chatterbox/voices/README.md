@@ -1,1 +1,0 @@
-Place a clean 6-10 second English narrator WAV at `voices/narrator.wav` on the remote GPU host. Use the same clip for every Chatterbox and CosyVoice comparison. Do not commit a person's voice without consent. This workspace intentionally contains no audio file.

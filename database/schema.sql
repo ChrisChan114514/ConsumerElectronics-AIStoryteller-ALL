@@ -46,6 +46,9 @@ CREATE TABLE IF NOT EXISTS story_audio (
   CONSTRAINT fk_story_audio_story FOREIGN KEY (story_id) REFERENCES stories(story_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- The application inserts audio rows only for single-card stories. Multi-card
+-- stories retain text and playback history without storing audio blobs.
+
 CREATE TABLE IF NOT EXISTS story_history (
   client_key VARCHAR(191) NOT NULL,
   story_id CHAR(36) NOT NULL,
