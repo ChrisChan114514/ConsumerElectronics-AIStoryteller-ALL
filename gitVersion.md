@@ -89,3 +89,10 @@ D:\Game2\ConsumerElectronics\wxDemo_StoryMachinePlan\Plan\初步计划.md 根据
 ### 0.03.3
 
 你在这个WebService\StoryTTS 文件夹里面，设计多个Nvida RTX5060 的部署方案，每一个就是一个子文件夹，比如WebService\StoryTTS\Kokoro，进行一个多并发的测试（不在本机，就是python代码和requirement写好，如果py不够快或者不合适，可以用其他语言，我都去搞定）,并生成测试音频（讲一段固定的故事，我听听比较质量），最终我来选择到底使用哪个模型；在本机不做测
+
+
+### 0.03.4
+
+现在本地的kokoro-82M（RTX5060）服务，达到了78.03的比率，可以用于语音推理，现在完全放弃了doubaoTTS，而是使用kokoro进行实验；所有语音，在当前版本，都使用kokoro_TensorRT_FP16推理方式进行
+
+正在训练一个学生模型，就是更加适用于故事机的较低音质需要
